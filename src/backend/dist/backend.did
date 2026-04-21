@@ -1,0 +1,168 @@
+type Timestamp = int;
+type SellerInput = 
+ record {
+   businessName: text;
+   email: text;
+   name: text;
+   phone: text;
+ };
+type SellerId = text;
+type Seller = 
+ record {
+   businessName: text;
+   createdAt: int;
+   email: text;
+   id: SellerId;
+   isApproved: bool;
+   name: text;
+   phone: text;
+ };
+type ProductInput = 
+ record {
+   category: text;
+   description: text;
+   fulfillmentBy: FulfillmentBy;
+   gender: text;
+   hasFitAndTry: bool;
+   hasSameDayDelivery: bool;
+   imageUrl: text;
+   name: text;
+   price: nat;
+   sellerId: text;
+   sellerName: text;
+   sizes: vec text;
+   stock: nat;
+ };
+type ProductId = text;
+type Product = 
+ record {
+   category: text;
+   description: text;
+   fulfillmentBy: FulfillmentBy;
+   gender: text;
+   hasFitAndTry: bool;
+   hasSameDayDelivery: bool;
+   id: ProductId;
+   imageUrl: text;
+   name: text;
+   orderCount: nat;
+   price: nat;
+   sellerId: text;
+   sellerName: text;
+   sizes: vec text;
+   stock: nat;
+ };
+type PaymentMethod = 
+ variant {
+   Card;
+   CashOnDelivery;
+ };
+type OrderStatus = 
+ variant {
+   Cancelled;
+   Confirmed;
+   Delivered;
+   Pending;
+   Processing;
+   Shipped;
+ };
+type OrderId = text;
+type Order = 
+ record {
+   createdAt: Timestamp;
+   customerName: text;
+   customerPhone: text;
+   deliveryOption: DeliveryOption;
+   id: OrderId;
+   items: vec CartItem;
+   paymentMethod: PaymentMethod;
+   shippingAddress: text;
+   status: OrderStatus;
+   total: nat;
+ };
+type NotificationId = text;
+type Notification = 
+ record {
+   createdAt: int;
+   id: NotificationId;
+   isRead: bool;
+   message: text;
+   orderId: opt text;
+   sellerId: opt text;
+ };
+type Measurements = 
+ record {
+   chest: nat;
+   height: nat;
+   waist: nat;
+   weight: nat;
+ };
+type FulfillmentBy = 
+ variant {
+   AdminFulfilled;
+   SellerFulfilled;
+ };
+type FitAndTryRequest = 
+ record {
+   measurements: Measurements;
+   preferredSize: text;
+   productId: ProductId;
+ };
+type DeliveryOption = 
+ variant {
+   NextDay;
+   SameDay;
+   Standard;
+ };
+type CartItem = 
+ record {
+   deliveryOption: DeliveryOption;
+   productId: ProductId;
+   quantity: nat;
+   selectedSize: text;
+ };
+service : {
+  addNotification: (message: text, sellerId: opt text, orderId: opt text) ->
+   (text);
+  cancelOrder: (id: OrderId) -> (bool);
+  createOrder: (items: vec CartItem, shippingAddress: text, deliveryOption:
+   DeliveryOption, paymentMethod: PaymentMethod, customerName: text,
+   customerPhone: text) -> (Order);
+  createProduct: (input: ProductInput) -> (variant {
+                                             err: text;
+                                             ok: Product;
+                                           });
+  deleteProduct: (id: ProductId) -> (variant {
+                                       err: text;
+                                       ok;
+                                     });
+  getNotifications: (sellerId: opt text) -> (vec Notification) query;
+  getOrder: (id: OrderId) -> (opt Order) query;
+  getProduct: (id: ProductId) -> (opt Product) query;
+  getProducts: () -> (vec Product) query;
+  getProductsBySeller: (sellerId: text) -> (vec Product) query;
+  getSeller: (id: SellerId) -> (opt Seller) query;
+  getSellerByEmailOrPhone: (email: text, phone: text) -> (opt Seller) query;
+  listOrders: () -> (vec record {
+                           OrderId;
+                           Order;
+                         }) query;
+  listSellers: () -> (vec Seller) query;
+  markNotificationRead: (notificationId: text) -> (bool);
+  registerSeller: (input: SellerInput) -> (variant {
+                                             err: text;
+                                             ok: Seller;
+                                           });
+  removeSeller: (sellerId: SellerId) -> (bool);
+  submitFitAndTryRequest: (req: FitAndTryRequest) -> (text);
+  updateOrderStatus: (id: OrderId, newStatus: OrderStatus) ->
+   (variant {
+      err: text;
+      ok: Order;
+    });
+  updateProduct: (id: ProductId, input: ProductInput) ->
+   (variant {
+      err: text;
+      ok: Product;
+    });
+}

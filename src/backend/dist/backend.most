@@ -1,0 +1,191 @@
+// Version: 3.0.0
+type CartItem__82369012 =
+  {
+    deliveryOption : DeliveryOption__185441652;
+    productId : ProductId__422882197;
+    quantity : Nat;
+    selectedSize : Text
+  };
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type DeliveryOption__185441652 = {#NextDay; #SameDay; #Standard};
+type FulfillmentBy__986856276 = {#AdminFulfilled; #SellerFulfilled};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type List__415060402<T> = List__790383201<T>;
+type List__790383201<T> =
+  {
+    var blockIndex : Nat__490723111;
+    var blocks : [var [var ?T]];
+    var elementIndex : Nat__490723111
+  };
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type NotificationId__362902261 = Text;
+type Notification__364046994 =
+  {
+    createdAt : Int;
+    id : NotificationId__362902261;
+    isRead : Bool;
+    message : Text;
+    orderId : ?Text;
+    sellerId : ?Text
+  };
+type OldCartItem__287857270 =
+  {
+    deliveryOption : OldDeliveryOption__138072616;
+    productId : ProductId__162144859;
+    quantity : Nat;
+    selectedSize : Text
+  };
+type OldDeliveryOption__138072616 = {#NextDay; #SameDay; #Standard};
+type OldOrderStatus__13175761 =
+  {#Confirmed; #Delivered; #Pending; #Processing; #Shipped};
+type OldOrder__235915581 =
+  {
+    createdAt : Timestamp__817121181;
+    deliveryOption : OldDeliveryOption__138072616;
+    id : OrderId__94491920;
+    items : [OldCartItem__287857270];
+    paymentMethod : OldPaymentMethod__832006779;
+    shippingAddress : Text;
+    status : OldOrderStatus__13175761;
+    total : Nat
+  };
+type OldPaymentMethod__832006779 = {#Card; #CashOnDelivery};
+type OldProduct__278484740 =
+  {
+    category : Text;
+    description : Text;
+    gender : Text;
+    hasFitAndTry : Bool;
+    hasSameDayDelivery : Bool;
+    id : ProductId__162144859;
+    imageUrl : Text;
+    name : Text;
+    price : Nat;
+    sellerId : Text;
+    sellerName : Text;
+    sizes : [Text];
+    stock : Nat
+  };
+type OldSeller__360852575 =
+  {
+    businessName : Text;
+    createdAt : Int;
+    email : Text;
+    id : SellerId__1067013352;
+    isApproved : Bool;
+    name : Text;
+    phone : Text
+  };
+type OrderId__197865225 = Text;
+type OrderId__809213956 = OrderId__197865225;
+type OrderId__94491920 = Text;
+type OrderStatus__33195791 =
+  {#Cancelled; #Confirmed; #Delivered; #Pending; #Processing; #Shipped};
+type Order__134283119 =
+  {
+    createdAt : Timestamp__659830543;
+    customerName : Text;
+    customerPhone : Text;
+    deliveryOption : DeliveryOption__185441652;
+    id : OrderId__809213956;
+    items : [CartItem__82369012];
+    paymentMethod : PaymentMethod__127529442;
+    shippingAddress : Text;
+    status : OrderStatus__33195791;
+    total : Nat
+  };
+type PaymentMethod__127529442 = {#Card; #CashOnDelivery};
+type ProductId__160010635 = Text;
+type ProductId__162144859 = Text;
+type ProductId__422882197 = ProductId__160010635;
+type Product__433464713 =
+  {
+    category : Text;
+    description : Text;
+    fulfillmentBy : FulfillmentBy__986856276;
+    gender : Text;
+    hasFitAndTry : Bool;
+    hasSameDayDelivery : Bool;
+    id : ProductId__422882197;
+    imageUrl : Text;
+    name : Text;
+    orderCount : Nat;
+    price : Nat;
+    sellerId : Text;
+    sellerName : Text;
+    sizes : [Text];
+    stock : Nat
+  };
+type SellerId__1067013352 = Text;
+type SellerId__850746642 = Text;
+type SellerId__932674275 = SellerId__850746642;
+type Seller__600159886 =
+  {
+    businessName : Text;
+    createdAt : Int;
+    email : Text;
+    id : SellerId__932674275;
+    isApproved : Bool;
+    name : Text;
+    phone : Text
+  };
+type Timestamp__301639476 = Int;
+type Timestamp__659830543 = Timestamp__301639476;
+type Timestamp__817121181 = Int;
+actor ({
+  in nextProductIdCounter : List__415060402<Nat>;
+  in nextSellerIdCounter : List__415060402<Nat>;
+  in orders : Map__605269027<OrderId__94491920, OldOrder__235915581>;
+  in products : Map__605269027<ProductId__162144859, OldProduct__278484740>;
+  in sellers : Map__605269027<SellerId__1067013352, OldSeller__360852575>
+}, {
+  stable nextNotificationIdCounter :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Nat]];
+      var elementIndex : Nat__490723111
+    };
+  stable nextProductIdCounter :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Nat]];
+      var elementIndex : Nat__490723111
+    };
+  stable nextSellerIdCounter :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Nat]];
+      var elementIndex : Nat__490723111
+    };
+  stable notifications :
+    {
+      var root :
+        Node__46230540<NotificationId__362902261, Notification__364046994>;
+      var size : Nat__490723111
+    };
+  stable orders :
+    {
+      var root : Node__46230540<OrderId__809213956, Order__134283119>;
+      var size : Nat__490723111
+    };
+  stable products :
+    {
+      var root : Node__46230540<ProductId__422882197, Product__433464713>;
+      var size : Nat__490723111
+    };
+  stable sellers :
+    {
+      var root : Node__46230540<SellerId__932674275, Seller__600159886>;
+      var size : Nat__490723111
+    }
+}) ;

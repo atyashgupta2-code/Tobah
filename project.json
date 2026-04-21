@@ -1,0 +1,25 @@
+{
+  "overview": "TBah is a Gen Z-focused e-commerce platform with same-day delivery, cash on delivery, and a unique Try At Home (Fit & Try) service. The admin panel lets the owner manage products directly — add, edit, and delete items from a secure, login-protected dashboard.",
+  "features": [
+    "Admin dashboard with product table (name, price, category, stock)",
+    "Add new products with a full form including image preview",
+    "Edit existing products with pre-filled form values",
+    "Delete products with confirmation modal",
+    "Login-protected admin area via Internet Identity",
+    "Instant product list refresh after any change",
+    "Product grid with TikTok-style cards",
+    "Try At Home (Fit & Try) at-home service",
+    "Same-day delivery with badges",
+    "Cash on delivery checkout"
+  ],
+  "category": "e-commerce",
+  "tags": [
+    "e-commerce",
+    "gen-z",
+    "admin-panel",
+    "product-management",
+    "try-at-home",
+    "same-day-delivery"
+  ],
+  "last_updated": "2026-04-16T17:24:49.779Z"
+}
