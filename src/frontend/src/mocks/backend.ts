@@ -1,6 +1,8 @@
 import type { backendInterface, Product, Order, CartItem, Seller } from "../backend";
 import { DeliveryOption, FulfillmentBy, OrderStatus, PaymentMethod } from "../backend.d";
 
+const NOW = BigInt(Date.now() * 1_000_000);
+
 const sampleProducts: Product[] = [
   {
     id: "p1",
@@ -18,6 +20,8 @@ const sampleProducts: Product[] = [
     sellerName: "Admin",
     orderCount: BigInt(12),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
+    isTrending: true,
+    createdAt: NOW,
   },
   {
     id: "p2",
@@ -35,6 +39,8 @@ const sampleProducts: Product[] = [
     sellerName: "Admin",
     orderCount: BigInt(7),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
+    isTrending: false,
+    createdAt: NOW,
   },
   {
     id: "p3",
@@ -52,6 +58,8 @@ const sampleProducts: Product[] = [
     sellerName: "Admin",
     orderCount: BigInt(3),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
+    isTrending: false,
+    createdAt: NOW,
   },
   {
     id: "p4",
@@ -69,6 +77,8 @@ const sampleProducts: Product[] = [
     sellerName: "Admin",
     orderCount: BigInt(18),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
+    isTrending: true,
+    createdAt: NOW,
   },
 ];
 
@@ -82,6 +92,8 @@ const sampleOrder: Order = {
   shippingAddress: "123 Street, City",
   customerName: "Demo Customer",
   customerPhone: "03001234567",
+  customerId: "03001234567",
+  fulfillmentChoice: FulfillmentBy.SellerFulfilled,
   items: [
     {
       productId: "p1",
@@ -98,6 +110,7 @@ const sampleSeller: Seller = {
   businessName: "UrbanThreads PK",
   email: "ahmed@example.com",
   phone: "03001234567",
+  address: "Shop 12, Main Market, Lahore, Punjab",
   isApproved: true,
   createdAt: BigInt(Date.now()),
 };
@@ -107,17 +120,19 @@ export const mockBackend: backendInterface = {
   getProduct: async (id) => sampleProducts.find((p) => p.id === id) ?? null,
   getProductsBySeller: async (sellerId) =>
     sampleProducts.filter((p) => p.sellerId === sellerId),
-  createOrder: async (_items, _address, _delivery, _payment, _customerName, _customerPhone) => sampleOrder,
+  createOrder: async (_items, _address, _delivery, _payment, _customerName, _customerPhone, _customerId) => sampleOrder,
   getOrder: async (_id) => sampleOrder,
   submitFitAndTryRequest: async (_req) =>
     "Your Fit & Try request has been confirmed! We'll bring it to your door.",
   createProduct: async (input) => ({
     __kind__: "ok",
-    ok: { ...input, id: `p${Date.now()}`, orderCount: BigInt(0) },
+    ok: { ...input, id: `p${Date.now()}`, orderCount: BigInt(0), createdAt: NOW },
   }),
-  updateProduct: async (id, input) => ({ __kind__: "ok", ok: { ...input, id, orderCount: BigInt(0) } }),
+  updateProduct: async (id, input) => ({ __kind__: "ok", ok: { ...input, id, orderCount: BigInt(0), createdAt: NOW } }),
   deleteProduct: async (_id) => ({ __kind__: "ok", ok: null }),
   listOrders: async () => [["order-001", sampleOrder]],
+  listOrdersByCustomer: async (_phone) => [sampleOrder],
+  listOrdersBySeller: async (_sellerId) => [sampleOrder],
   updateOrderStatus: async (_id, status) => ({
     __kind__: "ok",
     ok: { ...sampleOrder, status },
@@ -132,14 +147,77 @@ export const mockBackend: backendInterface = {
       businessName: input.businessName,
       email: input.email,
       phone: input.phone,
+      address: input.address,
       isApproved: false,
       createdAt: BigInt(Date.now()),
     },
   }),
+  registerCustomer: async (name, phone) => ({
+    id: phone,
+    name,
+    phone,
+    createdAt: BigInt(Date.now()),
+  }),
+  getCustomer: async (_phone) => null,
   addNotification: async (_message, _sellerId, _orderId) => `notif-${Date.now()}`,
-  cancelOrder: async (_id) => true,
+  cancelOrder: async (_id) => ({ __kind__: "ok", ok: null }),
   getNotifications: async (_sellerId) => [],
+  getAllNotifications: async () => [],
   getSellerByEmailOrPhone: async (_email, _phone) => null,
   markNotificationRead: async (_id) => true,
   removeSeller: async (_id) => true,
+  acceptOrder: async (_orderId, _fulfillmentChoice, _sellerName) => ({
+    __kind__: "ok",
+    ok: { ...sampleOrder, status: OrderStatus.Accepted, fulfillmentChoice: _fulfillmentChoice },
+  }),
+  rejectOrder: async (_orderId, _sellerName) => ({
+    __kind__: "ok",
+    ok: { ...sampleOrder, status: OrderStatus.Rejected },
+  }),
+  setProductTrending: async (_id, _trending) => ({
+    __kind__: "ok",
+    ok: { ...sampleProducts[0], isTrending: _trending },
+  }),
+  getNewArrivals: async () => sampleProducts.slice(0, 4),
+  getSellerEarnings: async (_sellerId) => ({
+    totalEarnings: BigInt(0),
+    orderCount: BigInt(0),
+    productBreakdown: [],
+  }),
+  listModelPhotos: async () => [],
+  addModelPhoto: async (imageUrl, caption) => ({
+    __kind__: "ok",
+    ok: {
+      id: `mp-${Date.now()}`,
+      imageUrl,
+      caption: caption ?? undefined,
+      createdAt: BigInt(Date.now()),
+    },
+  }),
+  deleteModelPhoto: async (_id) => ({ __kind__: "ok", ok: null }),
+  listCoupons: async () => [],
+  createCoupon: async (input) => ({
+    __kind__: "ok",
+    ok: {
+      id: `coupon-${Date.now()}`,
+      code: input.code,
+      description: input.description,
+      discountPercent: input.discountPercent,
+      isActive: true,
+      createdAt: BigInt(Date.now()),
+    },
+  }),
+  deleteCoupon: async (_id) => ({ __kind__: "ok", ok: null }),
+  toggleCoupon: async (_id) => ({
+    __kind__: "ok",
+    ok: {
+      id: _id,
+      code: "DEMO10",
+      description: "Demo 10% off",
+      discountPercent: BigInt(10),
+      isActive: true,
+      createdAt: BigInt(Date.now()),
+    },
+  }),
+  getCoupon: async (_code) => null,
 };

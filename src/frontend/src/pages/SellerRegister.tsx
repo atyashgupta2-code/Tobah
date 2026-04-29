@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "@tanstack/react-router";
 import { Store, Zap } from "lucide-react";
 import { useState } from "react";
@@ -12,12 +13,14 @@ interface FormState {
   name: string;
   email: string;
   phone: string;
+  address: string;
 }
 interface FormErrors {
   businessName?: string;
   name?: string;
   email?: string;
   phone?: string;
+  address?: string;
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -37,6 +40,7 @@ export default function SellerRegister() {
     name: "",
     email: "",
     phone: "",
+    address: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isReturning, setIsReturning] = useState(false);
@@ -55,6 +59,7 @@ export default function SellerRegister() {
       next.email = "Valid email is required";
     if (!form.phone.trim() || form.phone.trim().length < 10)
       next.phone = "Valid phone number is required";
+    if (!form.address.trim()) next.address = "Business address is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -68,6 +73,7 @@ export default function SellerRegister() {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
+        address: form.address.trim(),
       });
 
       localStorage.setItem("tbah_seller_id", seller.id);
@@ -195,6 +201,20 @@ export default function SellerRegister() {
               className={errors.phone ? "border-destructive" : ""}
             />
             <FieldError message={errors.phone} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="address">Business Address *</Label>
+            <Textarea
+              id="address"
+              data-ocid="seller.register.address_input"
+              value={form.address}
+              onChange={(e) => set("address", e.target.value)}
+              placeholder="e.g. Shop 12, Main Market, Jammu, J&K"
+              rows={2}
+              className={errors.address ? "border-destructive" : ""}
+            />
+            <FieldError message={errors.address} />
           </div>
 
           {registerSeller.isError && (

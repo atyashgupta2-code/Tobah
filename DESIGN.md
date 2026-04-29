@@ -23,6 +23,15 @@ Visible depth layers, bold oversized typography (Space Grotesk chunky headlines)
 | accent     | 0.75 0.22 65  | Warm amber, USP badges       |
 | muted      | 0.25 0.025 280| Secondary surface dimming    |
 
+## Category Cards
+
+| Category     | Primary OKLCH  | Secondary OKLCH | Meaning                 |
+| ------------ | -------------- | --------------- | ----------------------- |
+| Men          | 0.52 0.18 265  | 0.68 0.12 265   | Deep navy masculinity   |
+| Women        | 0.55 0.20 330  | 0.72 0.14 330   | Rose/magenta premium    |
+| Handicrafts  | 0.58 0.20 75   | 0.75 0.14 75    | Warm amber artisan      |
+| Other        | 0.50 0.16 295  | 0.65 0.11 295   | Purple/violet modern    |
+
 ## Typography
 
 - Display: Space Grotesk — bold, chunky headlines for hero and section titles
@@ -50,11 +59,16 @@ Large breathing room (6px–4rem) between sections; compact micro-spacing (4px�
 - Buttons: `btn-primary` (fuchsia, rounded-lg, hover scale-up) and `btn-accent` (amber, hover shadow)
 - Cards: bg-card, rounded-lg, border-subtle, shadow-elevated, TikTok-style vertical grid
 - Badges: `badge-usp` (amber pill, uppercase font-bold) for USP callouts (Fit & Try, Same Day)
+- Category Cards: 2x2 grid on mobile, gradient backgrounds (Men/Women/Handicrafts/Other), bold icon + label overlay, hover lift animation (scale-105, shadow-elevated)
+  - `.category-card-{men|women|handicrafts|other}`: applies distinct gradient
+  - `.category-card` parent: handles rounded-2xl, overflow, transition
+  - Icons: 80x80 on mobile (text-5xl), 96x96 on tablet (text-6xl), opacity-80 for depth
 
 ## Motion
 
 - Entrance: `fade-in` (0.4s) + `slide-up` (0.5s) on page load and scroll
 - Hover: `scale-105` on buttons, `pulse-glow` on accent badges
+- Card lift: Category cards trigger `scale-105` + `shadow-elevated` on hover/tap
 - Decorative: Smooth scroll transitions, no bounce
 
 ## Constraints
@@ -66,4 +80,4 @@ Large breathing room (6px–4rem) between sections; compact micro-spacing (4px�
 
 ## Signature Detail
 
-Pulsing glow aura on USP badges (`pulse-glow`) signals availability of premium features (same-day, fit-and-try) — drives conversational urgency and Gen Z impulse engagement.
+Pulsing glow aura on USP badges (`pulse-glow`) signals availability of premium features (same-day, fit-and-try) — drives conversational urgency and Gen Z impulse engagement. Category cards use bold gradient + icon typography to immediately communicate brand personality and collection intent, with lift animation on tap for tactile feedback.

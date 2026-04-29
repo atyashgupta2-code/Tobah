@@ -1,16 +1,20 @@
 import Types "../types/products-orders-delivery";
 import Lib "../lib/products-orders-delivery";
 import Map "mo:core/Map";
-import List "mo:core/List";
 
 mixin (
   products : Map.Map<Types.ProductId, Types.Product>,
   orders : Map.Map<Types.OrderId, Types.Order>,
   sellers : Map.Map<Types.SellerId, Types.Seller>,
   notifications : Map.Map<Types.NotificationId, Types.Notification>,
-  nextProductIdCounter : List.List<Nat>,
-  nextSellerIdCounter : List.List<Nat>,
-  nextNotificationIdCounter : List.List<Nat>,
+  customers : Map.Map<Types.CustomerId, Types.Customer>,
+  coupons : Map.Map<Types.CouponId, Types.Coupon>,
+  modelPhotos : Map.Map<Types.ModelPhotoId, Types.ModelPhoto>,
+  nextProductIdRef : [var Nat],
+  nextSellerIdRef : [var Nat],
+  nextNotificationIdRef : [var Nat],
+  nextCouponIdRef : [var Nat],
+  nextModelPhotoIdRef : [var Nat],
 ) {
   // ─── Products ──────────────────────────────────────────────────────────────
 
@@ -26,13 +30,18 @@ mixin (
     Lib.getProductsBySeller(products, sellerId);
   };
 
+  /// Returns the 8 most recently added products, sorted by createdAt descending.
+  public query func getNewArrivals() : async [Types.Product] {
+    Lib.getNewArrivals(products);
+  };
+
   // ─── Admin Product Mutations ────────────────────────────────────────────────
 
   public shared ({ caller }) func createProduct(input : Types.ProductInput) : async { #ok : Types.Product; #err : Text } {
-    let nextId = nextProductIdCounter.at(0);
-    let result = Lib.createProduct(products, nextId, input);
+    let currentId = nextProductIdRef[0];
+    let result = Lib.createProduct(products, currentId, input);
     switch (result) {
-      case (#ok(_)) { nextProductIdCounter.put(0, nextId + 1) };
+      case (#ok(_)) { nextProductIdRef[0] += 1 };
       case (#err(_)) {};
     };
     result;
@@ -46,6 +55,11 @@ mixin (
     Lib.deleteProduct(products, id);
   };
 
+  /// Admin-only: set or unset a product as trending.
+  public shared ({ caller }) func setProductTrending(productId : Types.ProductId, trending : Bool) : async { #ok : Types.Product; #err : Text } {
+    Lib.setProductTrending(products, productId, trending);
+  };
+
   // ─── Orders ────────────────────────────────────────────────────────────────
 
   public shared func createOrder(
@@ -55,24 +69,28 @@ mixin (
     paymentMethod : Types.PaymentMethod,
     customerName : Text,
     customerPhone : Text,
+    customerId : Types.CustomerId,
+    couponCode : ?Text,
   ) : async Types.Order {
-    // Use orders map size + 1 as auto-incrementing order id
     let orderId = orders.size() + 1;
-    let nextNotifId = nextNotificationIdCounter.at(0);
     let result = Lib.createOrder(
       orders,
       products,
+      sellers,
       notifications,
+      coupons,
       orderId,
-      nextNotifId,
+      nextNotificationIdRef[0],
       items,
       shippingAddress,
       deliveryOption,
       paymentMethod,
       customerName,
       customerPhone,
+      customerId,
+      couponCode,
     );
-    nextNotificationIdCounter.put(0, result.nextNotificationId);
+    nextNotificationIdRef[0] := result.nextNotificationId;
     result.order;
   };
 
@@ -84,24 +102,67 @@ mixin (
     Lib.listOrders(orders);
   };
 
+  public query func listOrdersByCustomer(phone : Text) : async [Types.Order] {
+    Lib.listOrdersByCustomer(orders, phone);
+  };
+
+  /// Returns all orders that contain at least one product belonging to the given seller.
+  public query func listOrdersBySeller(sellerId : Text) : async [Types.Order] {
+    Lib.listOrdersBySeller(orders, products, sellerId);
+  };
+
   public shared ({ caller }) func updateOrderStatus(id : Types.OrderId, newStatus : Types.OrderStatus) : async { #ok : Types.Order; #err : Text } {
     Lib.updateOrderStatus(orders, id, newStatus);
   };
 
-  public shared func cancelOrder(id : Types.OrderId) : async Bool {
+  /// Supplier accepts an order and selects delivery fulfillment (Seller or Admin).
+  /// Fires an admin notification with the supplier's name and delivery choice.
+  public shared func acceptOrder(
+    orderId : Types.OrderId,
+    fulfillmentChoice : Types.FulfillmentBy,
+    sellerName : Text,
+  ) : async { #ok : Types.Order; #err : Text } {
+    let result = Lib.acceptOrder(orders, notifications, nextNotificationIdRef[0], orderId, fulfillmentChoice, sellerName);
+    nextNotificationIdRef[0] := result.nextNotificationId;
+    result.result;
+  };
+
+  /// Supplier rejects an order.
+  /// Fires an admin notification only — customer is NOT notified of rejection.
+  public shared func rejectOrder(
+    orderId : Types.OrderId,
+    sellerName : Text,
+  ) : async { #ok : Types.Order; #err : Text } {
+    let result = Lib.rejectOrder(orders, notifications, nextNotificationIdRef[0], orderId, sellerName);
+    nextNotificationIdRef[0] := result.nextNotificationId;
+    result.result;
+  };
+
+  /// Customer cancels an order. Allowed unless order is Shipped or Delivered.
+  public shared func cancelOrder(id : Types.OrderId) : async { #ok : (); #err : Text } {
     Lib.cancelOrder(orders, id);
+  };
+
+  // ─── Customers ─────────────────────────────────────────────────────────────
+
+  public shared func registerCustomer(name : Text, phone : Text) : async Types.Customer {
+    Lib.registerCustomer(customers, name, phone);
+  };
+
+  public query func getCustomer(phone : Text) : async ?Types.Customer {
+    Lib.getCustomer(customers, phone);
   };
 
   // ─── Sellers ───────────────────────────────────────────────────────────────
 
   public shared func registerSeller(input : Types.SellerInput) : async { #ok : Types.Seller; #err : Text } {
-    let nextId = nextSellerIdCounter.at(0);
-    let result = Lib.registerSeller(sellers, nextId, input);
+    let currentId = nextSellerIdRef[0];
+    let result = Lib.registerSeller(sellers, currentId, input);
     switch (result) {
       case (#ok(seller)) {
-        // Only increment if this was a new seller (id matches nextId as Text)
-        if (seller.id == nextId.toText()) {
-          nextSellerIdCounter.put(0, nextId + 1);
+        // Only increment if this was a new seller (id matches currentId as Text)
+        if (seller.id == currentId.toText()) {
+          nextSellerIdRef[0] += 1;
         };
       };
       case (#err(_)) {};
@@ -125,17 +186,88 @@ mixin (
     Lib.removeSeller(sellers, products, sellerId);
   };
 
+  // ─── Seller Earnings ───────────────────────────────────────────────────────
+
+  /// Returns total revenue and per-product breakdown for a seller.
+  /// Only counts orders with status #Placed or #Accepted.
+  public query func getSellerEarnings(sellerId : Text) : async Types.SellerEarnings {
+    Lib.getSellerEarnings(orders, products, sellerId);
+  };
+
+  // ─── Coupons (admin-controlled) ────────────────────────────────────────────
+
+  /// Admin creates a new discount coupon.
+  public shared ({ caller }) func createCoupon(input : Types.CouponInput) : async { #ok : Types.Coupon; #err : Text } {
+    let currentId = nextCouponIdRef[0];
+    let result = Lib.createCoupon(coupons, currentId, input);
+    switch (result) {
+      case (#ok(_)) { nextCouponIdRef[0] += 1 };
+      case (#err(_)) {};
+    };
+    result;
+  };
+
+  /// Public: validate and fetch an active coupon by its code. Used at checkout.
+  public query func getCoupon(code : Text) : async ?Types.Coupon {
+    Lib.getCouponByCode(coupons, code);
+  };
+
+  /// Admin lists all coupons (active and inactive).
+  public shared query ({ caller }) func listCoupons() : async [Types.Coupon] {
+    Lib.listCoupons(coupons);
+  };
+
+  /// Admin deletes a coupon by id.
+  public shared ({ caller }) func deleteCoupon(id : Types.CouponId) : async { #ok : (); #err : Text } {
+    Lib.deleteCoupon(coupons, id);
+  };
+
+  /// Admin toggles a coupon active/inactive.
+  public shared ({ caller }) func toggleCoupon(id : Types.CouponId) : async { #ok : Types.Coupon; #err : Text } {
+    Lib.toggleCoupon(coupons, id);
+  };
+
+  // ─── Model Showcase ────────────────────────────────────────────────────────
+
+  /// Admin adds a model showcase photo. caption is optional.
+  public shared ({ caller }) func addModelPhoto(imageUrl : Text, caption : ?Text) : async { #ok : Types.ModelPhoto; #err : Text } {
+    let currentId = nextModelPhotoIdRef[0];
+    let result = Lib.addModelPhoto(modelPhotos, currentId, imageUrl, caption);
+    switch (result) {
+      case (#ok(_)) { nextModelPhotoIdRef[0] += 1 };
+      case (#err(_)) {};
+    };
+    result;
+  };
+
+  /// Public: list all model showcase photos (newest first).
+  public query func listModelPhotos() : async [Types.ModelPhoto] {
+    Lib.listModelPhotos(modelPhotos);
+  };
+
+  /// Admin deletes a model showcase photo.
+  public shared ({ caller }) func deleteModelPhoto(id : Types.ModelPhotoId) : async { #ok : (); #err : Text } {
+    Lib.deleteModelPhoto(modelPhotos, id);
+  };
+
   // ─── Notifications ─────────────────────────────────────────────────────────
 
   public shared func addNotification(message : Text, sellerId : ?Text, orderId : ?Text) : async Text {
-    let nextId = nextNotificationIdCounter.at(0);
-    let result = Lib.addNotification(notifications, nextId, message, sellerId, orderId);
-    nextNotificationIdCounter.put(0, result.nextId);
+    let result = Lib.addNotification(notifications, nextNotificationIdRef[0], message, sellerId, orderId);
+    nextNotificationIdRef[0] := result.nextId;
     result.notification.id;
   };
 
+  /// Get notifications filtered by sellerId:
+  /// - null = admin notifications only (admin-targeted, sellerId = null)
+  /// - ?id = supplier-specific notifications for that supplier
   public query func getNotifications(sellerId : ?Text) : async [Types.Notification] {
     Lib.getNotifications(notifications, sellerId);
+  };
+
+  /// Get ALL notifications regardless of target — for admin overview.
+  public shared query ({ caller }) func getAllNotifications() : async [Types.Notification] {
+    Lib.getAllNotifications(notifications);
   };
 
   public shared func markNotificationRead(notificationId : Text) : async Bool {

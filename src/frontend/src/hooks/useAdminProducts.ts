@@ -2,6 +2,8 @@ import { useActor } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createActor } from "../backend";
 import type {
+  Coupon,
+  CouponInput,
   Notification,
   Order,
   OrderId,
@@ -132,6 +134,20 @@ export function useGetAdminNotifications() {
   });
 }
 
+/** Poll ALL notifications globally (for admin overview panel). Polls every 15s. */
+export function useGetAllAdminNotifications() {
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery<Notification[]>({
+    queryKey: ["notifications", "admin", "all"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllNotifications();
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 15_000,
+  });
+}
+
 /** Mark a notification as read (admin side) */
 export function useMarkAdminNotificationRead() {
   const { actor } = useActor(createActor);
@@ -143,6 +159,131 @@ export function useMarkAdminNotificationRead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", "admin"] });
+      queryClient.invalidateQueries({
+        queryKey: ["notifications", "admin", "all"],
+      });
+    },
+  });
+}
+
+/** Mark or unmark a product as trending (admin only) */
+export function useSetProductTrending() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<
+    { __kind__: "ok"; ok: Product } | { __kind__: "err"; err: string },
+    Error,
+    { productId: string; trending: boolean }
+  >({
+    mutationFn: async ({ productId, trending }) => {
+      if (!actor) throw new Error("Actor not ready");
+      return actor.setProductTrending(productId, trending);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+}
+
+// ─── Coupon hooks ──────────────────────────────────────────────────────────────
+
+export function useListCoupons() {
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery<Coupon[]>({
+    queryKey: ["coupons"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listCoupons();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useCreateCoupon() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<Coupon, Error, CouponInput>({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Actor not ready");
+      const result = await actor.createCoupon(input);
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coupons"] });
+    },
+  });
+}
+
+export function useDeleteCoupon() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: async (id) => {
+      if (!actor) throw new Error("Actor not ready");
+      const result = await actor.deleteCoupon(id);
+      if (result.__kind__ === "err") throw new Error(result.err);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coupons"] });
+    },
+  });
+}
+
+export function useToggleCoupon() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<Coupon, Error, string>({
+    mutationFn: async (id) => {
+      if (!actor) throw new Error("Actor not ready");
+      const result = await actor.toggleCoupon(id);
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coupons"] });
+    },
+  });
+}
+
+// ─── Model Photo hooks ─────────────────────────────────────────────────────────
+
+/** Add a model photo (admin only) */
+export function useAddModelPhoto() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<
+    | { __kind__: "ok"; ok: import("../backend.d").ModelPhoto }
+    | { __kind__: "err"; err: string },
+    Error,
+    { imageUrl: string; caption: string | null }
+  >({
+    mutationFn: async ({ imageUrl, caption }) => {
+      if (!actor) throw new Error("Actor not ready");
+      return actor.addModelPhoto(imageUrl, caption);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model-photos"] });
+    },
+  });
+}
+
+/** Delete a model photo (admin only) */
+export function useDeleteModelPhoto() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<
+    { __kind__: "ok"; ok: null } | { __kind__: "err"; err: string },
+    Error,
+    string
+  >({
+    mutationFn: async (id) => {
+      if (!actor) throw new Error("Actor not ready");
+      return actor.deleteModelPhoto(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model-photos"] });
     },
   });
 }

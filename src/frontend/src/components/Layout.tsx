@@ -1,7 +1,17 @@
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "@tanstack/react-router";
-import { Grid3X3, Home, Menu, ShoppingBag, Store, X } from "lucide-react";
+import {
+  Grid3X3,
+  Home,
+  Menu,
+  Package,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  X,
+} from "lucide-react";
 import { useState } from "react";
+import { useCustomer } from "../contexts/CustomerContext";
 import { useCart } from "../hooks/useCart";
 
 interface LayoutProps {
@@ -12,11 +22,14 @@ const mobileNav = [
   { to: "/", label: "HOME", icon: Home, exact: true },
   { to: "/shop", label: "SHOP", icon: Grid3X3, exact: false },
   { to: "/cart", label: "BAG", icon: ShoppingBag, exact: false },
+  { to: "/models", label: "MODELS", icon: Sparkles, exact: false },
+  { to: "/customer/orders", label: "ORDERS", icon: Package, exact: false },
 ];
 
 export function Layout({ children }: LayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { itemCount } = useCart();
+  const { currentCustomer, isLoggedIn } = useCustomer();
   const location = useLocation();
 
   function isActive(to: string, exact: boolean) {
@@ -58,6 +71,52 @@ export function Layout({ children }: LayoutProps) {
                 {label}
               </Link>
             ))}
+
+            {/* My Orders / Models — desktop */}
+            {isLoggedIn ? (
+              <>
+                <Link
+                  to="/models"
+                  data-ocid="nav.models_link"
+                  className={cn(
+                    "text-sm font-semibold transition-smooth flex items-center gap-1.5",
+                    isActive("/models", false)
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Sparkles size={13} />
+                  Models
+                </Link>
+                <Link
+                  to="/customer/orders"
+                  data-ocid="nav.my_orders_link"
+                  className={cn(
+                    "text-sm font-semibold transition-smooth flex items-center gap-1.5",
+                    isActive("/customer/orders", false)
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Package size={13} />
+                  My Orders
+                </Link>
+              </>
+            ) : (
+              <Link
+                to="/customer/login"
+                data-ocid="nav.customer_login_link"
+                className={cn(
+                  "text-sm font-semibold transition-smooth",
+                  isActive("/customer/login", false)
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Login
+              </Link>
+            )}
+
             {/* Sell on TBah — desktop */}
             <Link
               to="/seller/register"
@@ -71,6 +130,18 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Right actions */}
           <div className="flex items-center gap-2">
+            {/* Customer pill — desktop */}
+            {isLoggedIn && (
+              <Link
+                to="/customer/orders"
+                data-ocid="nav.customer_pill"
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold hover:bg-primary/20 transition-smooth"
+              >
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                {currentCustomer?.name.split(" ")[0]}
+              </Link>
+            )}
+
             <Link
               to="/cart"
               data-ocid="nav.cart_button"
@@ -120,6 +191,55 @@ export function Layout({ children }: LayoutProps) {
                   {label}
                 </Link>
               ))}
+
+              {/* My Orders / Login — mobile */}
+              {isLoggedIn ? (
+                <>
+                  <Link
+                    to="/models"
+                    data-ocid="mobile_menu.models_link"
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "px-4 py-3 rounded-xl font-semibold text-sm transition-smooth flex items-center gap-2",
+                      isActive("/models", false)
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <Sparkles size={15} />
+                    Models
+                  </Link>
+                  <Link
+                    to="/customer/orders"
+                    data-ocid="mobile_menu.my_orders_link"
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "px-4 py-3 rounded-xl font-semibold text-sm transition-smooth flex items-center gap-2",
+                      isActive("/customer/orders", false)
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <Package size={15} />
+                    My Orders
+                    {currentCustomer && (
+                      <span className="ml-auto text-xs text-primary font-bold">
+                        {currentCustomer.name.split(" ")[0]}
+                      </span>
+                    )}
+                  </Link>
+                </>
+              ) : (
+                <Link
+                  to="/customer/login"
+                  data-ocid="mobile_menu.customer_login_link"
+                  onClick={() => setMenuOpen(false)}
+                  className="px-4 py-3 rounded-xl font-semibold text-sm transition-smooth text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-2"
+                >
+                  Login to see orders
+                </Link>
+              )}
+
               {/* Sell on TBah — mobile */}
               <Link
                 to="/seller/register"
@@ -135,11 +255,14 @@ export function Layout({ children }: LayoutProps) {
         )}
       </header>
 
-      {/* Main content — NO USP bar */}
+      {/* Main content */}
       <main className="flex-1 bg-background pb-20 md:pb-0">{children}</main>
 
-      {/* Bottom mobile nav — thumb-accessible */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border/60 shadow-[0_-4px_24px_rgba(0,0,0,0.4)]">
+      {/* Bottom mobile nav — thumb-accessible, uses will-change + transform to prevent layout shifts */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border/60 shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
+        style={{ transform: "translateZ(0)", willChange: "transform" }}
+      >
         <div className="flex items-center justify-around h-16 px-2">
           {mobileNav.map(({ to, label, icon: Icon, exact }) => {
             const active = isActive(to, exact);

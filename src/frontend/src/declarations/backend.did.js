@@ -9,46 +9,75 @@
 import { IDL } from '@icp-sdk/core/candid';
 
 export const OrderId = IDL.Text;
-export const ProductId = IDL.Text;
+export const FulfillmentBy = IDL.Variant({
+  'AdminFulfilled' : IDL.Null,
+  'SellerFulfilled' : IDL.Null,
+});
+export const OrderStatus = IDL.Variant({
+  'Delivered' : IDL.Null,
+  'Confirmed' : IDL.Null,
+  'Placed' : IDL.Null,
+  'Rejected' : IDL.Null,
+  'Accepted' : IDL.Null,
+  'Cancelled' : IDL.Null,
+  'Processing' : IDL.Null,
+  'Shipped' : IDL.Null,
+  'Pending' : IDL.Null,
+});
+export const PaymentMethod = IDL.Variant({
+  'Card' : IDL.Null,
+  'CashOnDelivery' : IDL.Null,
+});
+export const Timestamp = IDL.Int;
 export const DeliveryOption = IDL.Variant({
   'SameDay' : IDL.Null,
   'NextDay' : IDL.Null,
   'Standard' : IDL.Null,
 });
+export const CustomerId = IDL.Text;
+export const ProductId = IDL.Text;
 export const CartItem = IDL.Record({
   'productId' : ProductId,
   'deliveryOption' : DeliveryOption,
   'quantity' : IDL.Nat,
   'selectedSize' : IDL.Text,
 });
-export const PaymentMethod = IDL.Variant({
-  'Card' : IDL.Null,
-  'CashOnDelivery' : IDL.Null,
-});
-export const OrderStatus = IDL.Variant({
-  'Delivered' : IDL.Null,
-  'Confirmed' : IDL.Null,
-  'Cancelled' : IDL.Null,
-  'Processing' : IDL.Null,
-  'Shipped' : IDL.Null,
-  'Pending' : IDL.Null,
-});
-export const Timestamp = IDL.Int;
 export const Order = IDL.Record({
   'id' : OrderId,
   'customerName' : IDL.Text,
   'status' : OrderStatus,
+  'couponCode' : IDL.Opt(IDL.Text),
   'total' : IDL.Nat,
   'paymentMethod' : PaymentMethod,
   'customerPhone' : IDL.Text,
+  'discountAmount' : IDL.Opt(IDL.Nat),
   'createdAt' : Timestamp,
   'deliveryOption' : DeliveryOption,
   'shippingAddress' : IDL.Text,
+  'customerId' : CustomerId,
   'items' : IDL.Vec(CartItem),
+  'fulfillmentChoice' : IDL.Opt(FulfillmentBy),
 });
-export const FulfillmentBy = IDL.Variant({
-  'AdminFulfilled' : IDL.Null,
-  'SellerFulfilled' : IDL.Null,
+export const ModelPhotoId = IDL.Text;
+export const ModelPhoto = IDL.Record({
+  'id' : ModelPhotoId,
+  'createdAt' : Timestamp,
+  'imageUrl' : IDL.Text,
+  'caption' : IDL.Opt(IDL.Text),
+});
+export const CouponInput = IDL.Record({
+  'code' : IDL.Text,
+  'description' : IDL.Text,
+  'discountPercent' : IDL.Nat,
+});
+export const CouponId = IDL.Text;
+export const Coupon = IDL.Record({
+  'id' : CouponId,
+  'code' : IDL.Text,
+  'createdAt' : Timestamp,
+  'description' : IDL.Text,
+  'discountPercent' : IDL.Nat,
+  'isActive' : IDL.Bool,
 });
 export const ProductInput = IDL.Record({
   'fulfillmentBy' : FulfillmentBy,
@@ -64,11 +93,13 @@ export const ProductInput = IDL.Record({
   'category' : IDL.Text,
   'sellerId' : IDL.Text,
   'price' : IDL.Nat,
+  'isTrending' : IDL.Bool,
 });
 export const Product = IDL.Record({
   'id' : ProductId,
   'fulfillmentBy' : FulfillmentBy,
   'name' : IDL.Text,
+  'createdAt' : IDL.Int,
   'description' : IDL.Text,
   'hasFitAndTry' : IDL.Bool,
   'sizes' : IDL.Vec(IDL.Text),
@@ -81,6 +112,7 @@ export const Product = IDL.Record({
   'category' : IDL.Text,
   'sellerId' : IDL.Text,
   'price' : IDL.Nat,
+  'isTrending' : IDL.Bool,
 });
 export const NotificationId = IDL.Text;
 export const Notification = IDL.Record({
@@ -91,6 +123,12 @@ export const Notification = IDL.Record({
   'message' : IDL.Text,
   'sellerId' : IDL.Opt(IDL.Text),
 });
+export const Customer = IDL.Record({
+  'id' : CustomerId,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'phone' : IDL.Text,
+});
 export const SellerId = IDL.Text;
 export const Seller = IDL.Record({
   'id' : SellerId,
@@ -99,12 +137,25 @@ export const Seller = IDL.Record({
   'createdAt' : IDL.Int,
   'businessName' : IDL.Text,
   'email' : IDL.Text,
+  'address' : IDL.Text,
   'phone' : IDL.Text,
+});
+export const ProductEarningBreakdown = IDL.Record({
+  'productId' : IDL.Text,
+  'productName' : IDL.Text,
+  'orderCount' : IDL.Nat,
+  'totalRevenue' : IDL.Nat,
+});
+export const SellerEarnings = IDL.Record({
+  'productBreakdown' : IDL.Vec(ProductEarningBreakdown),
+  'orderCount' : IDL.Nat,
+  'totalEarnings' : IDL.Nat,
 });
 export const SellerInput = IDL.Record({
   'name' : IDL.Text,
   'businessName' : IDL.Text,
   'email' : IDL.Text,
+  'address' : IDL.Text,
   'phone' : IDL.Text,
 });
 export const Measurements = IDL.Record({
@@ -120,12 +171,31 @@ export const FitAndTryRequest = IDL.Record({
 });
 
 export const idlService = IDL.Service({
+  'acceptOrder' : IDL.Func(
+      [OrderId, FulfillmentBy, IDL.Text],
+      [IDL.Variant({ 'ok' : Order, 'err' : IDL.Text })],
+      [],
+    ),
+  'addModelPhoto' : IDL.Func(
+      [IDL.Text, IDL.Opt(IDL.Text)],
+      [IDL.Variant({ 'ok' : ModelPhoto, 'err' : IDL.Text })],
+      [],
+    ),
   'addNotification' : IDL.Func(
       [IDL.Text, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
       [IDL.Text],
       [],
     ),
-  'cancelOrder' : IDL.Func([OrderId], [IDL.Bool], []),
+  'cancelOrder' : IDL.Func(
+      [OrderId],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'createCoupon' : IDL.Func(
+      [CouponInput],
+      [IDL.Variant({ 'ok' : Coupon, 'err' : IDL.Text })],
+      [],
+    ),
   'createOrder' : IDL.Func(
       [
         IDL.Vec(CartItem),
@@ -134,6 +204,8 @@ export const idlService = IDL.Service({
         PaymentMethod,
         IDL.Text,
         IDL.Text,
+        CustomerId,
+        IDL.Opt(IDL.Text),
       ],
       [Order],
       [],
@@ -143,11 +215,25 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],
       [],
     ),
+  'deleteCoupon' : IDL.Func(
+      [CouponId],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'deleteModelPhoto' : IDL.Func(
+      [ModelPhotoId],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'deleteProduct' : IDL.Func(
       [ProductId],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'getAllNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+  'getCoupon' : IDL.Func([IDL.Text], [IDL.Opt(Coupon)], ['query']),
+  'getCustomer' : IDL.Func([IDL.Text], [IDL.Opt(Customer)], ['query']),
+  'getNewArrivals' : IDL.Func([], [IDL.Vec(Product)], ['query']),
   'getNotifications' : IDL.Func(
       [IDL.Opt(IDL.Text)],
       [IDL.Vec(Notification)],
@@ -163,16 +249,37 @@ export const idlService = IDL.Service({
       [IDL.Opt(Seller)],
       ['query'],
     ),
+  'getSellerEarnings' : IDL.Func([IDL.Text], [SellerEarnings], ['query']),
+  'listCoupons' : IDL.Func([], [IDL.Vec(Coupon)], ['query']),
+  'listModelPhotos' : IDL.Func([], [IDL.Vec(ModelPhoto)], ['query']),
   'listOrders' : IDL.Func([], [IDL.Vec(IDL.Tuple(OrderId, Order))], ['query']),
+  'listOrdersByCustomer' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
+  'listOrdersBySeller' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
   'listSellers' : IDL.Func([], [IDL.Vec(Seller)], ['query']),
   'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'registerCustomer' : IDL.Func([IDL.Text, IDL.Text], [Customer], []),
   'registerSeller' : IDL.Func(
       [SellerInput],
       [IDL.Variant({ 'ok' : Seller, 'err' : IDL.Text })],
       [],
     ),
+  'rejectOrder' : IDL.Func(
+      [OrderId, IDL.Text],
+      [IDL.Variant({ 'ok' : Order, 'err' : IDL.Text })],
+      [],
+    ),
   'removeSeller' : IDL.Func([SellerId], [IDL.Bool], []),
+  'setProductTrending' : IDL.Func(
+      [ProductId, IDL.Bool],
+      [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],
+      [],
+    ),
   'submitFitAndTryRequest' : IDL.Func([FitAndTryRequest], [IDL.Text], []),
+  'toggleCoupon' : IDL.Func(
+      [CouponId],
+      [IDL.Variant({ 'ok' : Coupon, 'err' : IDL.Text })],
+      [],
+    ),
   'updateOrderStatus' : IDL.Func(
       [OrderId, OrderStatus],
       [IDL.Variant({ 'ok' : Order, 'err' : IDL.Text })],
@@ -189,46 +296,75 @@ export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
   const OrderId = IDL.Text;
-  const ProductId = IDL.Text;
+  const FulfillmentBy = IDL.Variant({
+    'AdminFulfilled' : IDL.Null,
+    'SellerFulfilled' : IDL.Null,
+  });
+  const OrderStatus = IDL.Variant({
+    'Delivered' : IDL.Null,
+    'Confirmed' : IDL.Null,
+    'Placed' : IDL.Null,
+    'Rejected' : IDL.Null,
+    'Accepted' : IDL.Null,
+    'Cancelled' : IDL.Null,
+    'Processing' : IDL.Null,
+    'Shipped' : IDL.Null,
+    'Pending' : IDL.Null,
+  });
+  const PaymentMethod = IDL.Variant({
+    'Card' : IDL.Null,
+    'CashOnDelivery' : IDL.Null,
+  });
+  const Timestamp = IDL.Int;
   const DeliveryOption = IDL.Variant({
     'SameDay' : IDL.Null,
     'NextDay' : IDL.Null,
     'Standard' : IDL.Null,
   });
+  const CustomerId = IDL.Text;
+  const ProductId = IDL.Text;
   const CartItem = IDL.Record({
     'productId' : ProductId,
     'deliveryOption' : DeliveryOption,
     'quantity' : IDL.Nat,
     'selectedSize' : IDL.Text,
   });
-  const PaymentMethod = IDL.Variant({
-    'Card' : IDL.Null,
-    'CashOnDelivery' : IDL.Null,
-  });
-  const OrderStatus = IDL.Variant({
-    'Delivered' : IDL.Null,
-    'Confirmed' : IDL.Null,
-    'Cancelled' : IDL.Null,
-    'Processing' : IDL.Null,
-    'Shipped' : IDL.Null,
-    'Pending' : IDL.Null,
-  });
-  const Timestamp = IDL.Int;
   const Order = IDL.Record({
     'id' : OrderId,
     'customerName' : IDL.Text,
     'status' : OrderStatus,
+    'couponCode' : IDL.Opt(IDL.Text),
     'total' : IDL.Nat,
     'paymentMethod' : PaymentMethod,
     'customerPhone' : IDL.Text,
+    'discountAmount' : IDL.Opt(IDL.Nat),
     'createdAt' : Timestamp,
     'deliveryOption' : DeliveryOption,
     'shippingAddress' : IDL.Text,
+    'customerId' : CustomerId,
     'items' : IDL.Vec(CartItem),
+    'fulfillmentChoice' : IDL.Opt(FulfillmentBy),
   });
-  const FulfillmentBy = IDL.Variant({
-    'AdminFulfilled' : IDL.Null,
-    'SellerFulfilled' : IDL.Null,
+  const ModelPhotoId = IDL.Text;
+  const ModelPhoto = IDL.Record({
+    'id' : ModelPhotoId,
+    'createdAt' : Timestamp,
+    'imageUrl' : IDL.Text,
+    'caption' : IDL.Opt(IDL.Text),
+  });
+  const CouponInput = IDL.Record({
+    'code' : IDL.Text,
+    'description' : IDL.Text,
+    'discountPercent' : IDL.Nat,
+  });
+  const CouponId = IDL.Text;
+  const Coupon = IDL.Record({
+    'id' : CouponId,
+    'code' : IDL.Text,
+    'createdAt' : Timestamp,
+    'description' : IDL.Text,
+    'discountPercent' : IDL.Nat,
+    'isActive' : IDL.Bool,
   });
   const ProductInput = IDL.Record({
     'fulfillmentBy' : FulfillmentBy,
@@ -244,11 +380,13 @@ export const idlFactory = ({ IDL }) => {
     'category' : IDL.Text,
     'sellerId' : IDL.Text,
     'price' : IDL.Nat,
+    'isTrending' : IDL.Bool,
   });
   const Product = IDL.Record({
     'id' : ProductId,
     'fulfillmentBy' : FulfillmentBy,
     'name' : IDL.Text,
+    'createdAt' : IDL.Int,
     'description' : IDL.Text,
     'hasFitAndTry' : IDL.Bool,
     'sizes' : IDL.Vec(IDL.Text),
@@ -261,6 +399,7 @@ export const idlFactory = ({ IDL }) => {
     'category' : IDL.Text,
     'sellerId' : IDL.Text,
     'price' : IDL.Nat,
+    'isTrending' : IDL.Bool,
   });
   const NotificationId = IDL.Text;
   const Notification = IDL.Record({
@@ -271,6 +410,12 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Text,
     'sellerId' : IDL.Opt(IDL.Text),
   });
+  const Customer = IDL.Record({
+    'id' : CustomerId,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'phone' : IDL.Text,
+  });
   const SellerId = IDL.Text;
   const Seller = IDL.Record({
     'id' : SellerId,
@@ -279,12 +424,25 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : IDL.Int,
     'businessName' : IDL.Text,
     'email' : IDL.Text,
+    'address' : IDL.Text,
     'phone' : IDL.Text,
+  });
+  const ProductEarningBreakdown = IDL.Record({
+    'productId' : IDL.Text,
+    'productName' : IDL.Text,
+    'orderCount' : IDL.Nat,
+    'totalRevenue' : IDL.Nat,
+  });
+  const SellerEarnings = IDL.Record({
+    'productBreakdown' : IDL.Vec(ProductEarningBreakdown),
+    'orderCount' : IDL.Nat,
+    'totalEarnings' : IDL.Nat,
   });
   const SellerInput = IDL.Record({
     'name' : IDL.Text,
     'businessName' : IDL.Text,
     'email' : IDL.Text,
+    'address' : IDL.Text,
     'phone' : IDL.Text,
   });
   const Measurements = IDL.Record({
@@ -300,12 +458,31 @@ export const idlFactory = ({ IDL }) => {
   });
   
   return IDL.Service({
+    'acceptOrder' : IDL.Func(
+        [OrderId, FulfillmentBy, IDL.Text],
+        [IDL.Variant({ 'ok' : Order, 'err' : IDL.Text })],
+        [],
+      ),
+    'addModelPhoto' : IDL.Func(
+        [IDL.Text, IDL.Opt(IDL.Text)],
+        [IDL.Variant({ 'ok' : ModelPhoto, 'err' : IDL.Text })],
+        [],
+      ),
     'addNotification' : IDL.Func(
         [IDL.Text, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
         [IDL.Text],
         [],
       ),
-    'cancelOrder' : IDL.Func([OrderId], [IDL.Bool], []),
+    'cancelOrder' : IDL.Func(
+        [OrderId],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'createCoupon' : IDL.Func(
+        [CouponInput],
+        [IDL.Variant({ 'ok' : Coupon, 'err' : IDL.Text })],
+        [],
+      ),
     'createOrder' : IDL.Func(
         [
           IDL.Vec(CartItem),
@@ -314,6 +491,8 @@ export const idlFactory = ({ IDL }) => {
           PaymentMethod,
           IDL.Text,
           IDL.Text,
+          CustomerId,
+          IDL.Opt(IDL.Text),
         ],
         [Order],
         [],
@@ -323,11 +502,25 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],
         [],
       ),
+    'deleteCoupon' : IDL.Func(
+        [CouponId],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'deleteModelPhoto' : IDL.Func(
+        [ModelPhotoId],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'deleteProduct' : IDL.Func(
         [ProductId],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'getAllNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+    'getCoupon' : IDL.Func([IDL.Text], [IDL.Opt(Coupon)], ['query']),
+    'getCustomer' : IDL.Func([IDL.Text], [IDL.Opt(Customer)], ['query']),
+    'getNewArrivals' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'getNotifications' : IDL.Func(
         [IDL.Opt(IDL.Text)],
         [IDL.Vec(Notification)],
@@ -343,20 +536,41 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(Seller)],
         ['query'],
       ),
+    'getSellerEarnings' : IDL.Func([IDL.Text], [SellerEarnings], ['query']),
+    'listCoupons' : IDL.Func([], [IDL.Vec(Coupon)], ['query']),
+    'listModelPhotos' : IDL.Func([], [IDL.Vec(ModelPhoto)], ['query']),
     'listOrders' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(OrderId, Order))],
         ['query'],
       ),
+    'listOrdersByCustomer' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
+    'listOrdersBySeller' : IDL.Func([IDL.Text], [IDL.Vec(Order)], ['query']),
     'listSellers' : IDL.Func([], [IDL.Vec(Seller)], ['query']),
     'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'registerCustomer' : IDL.Func([IDL.Text, IDL.Text], [Customer], []),
     'registerSeller' : IDL.Func(
         [SellerInput],
         [IDL.Variant({ 'ok' : Seller, 'err' : IDL.Text })],
         [],
       ),
+    'rejectOrder' : IDL.Func(
+        [OrderId, IDL.Text],
+        [IDL.Variant({ 'ok' : Order, 'err' : IDL.Text })],
+        [],
+      ),
     'removeSeller' : IDL.Func([SellerId], [IDL.Bool], []),
+    'setProductTrending' : IDL.Func(
+        [ProductId, IDL.Bool],
+        [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],
+        [],
+      ),
     'submitFitAndTryRequest' : IDL.Func([FitAndTryRequest], [IDL.Text], []),
+    'toggleCoupon' : IDL.Func(
+        [CouponId],
+        [IDL.Variant({ 'ok' : Coupon, 'err' : IDL.Text })],
+        [],
+      ),
     'updateOrderStatus' : IDL.Func(
         [OrderId, OrderStatus],
         [IDL.Variant({ 'ok' : Order, 'err' : IDL.Text })],

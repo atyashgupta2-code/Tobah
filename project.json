@@ -1,25 +1,23 @@
 {
-  "overview": "TBah is a Gen Z-focused e-commerce platform with same-day delivery, cash on delivery, and a unique Try At Home (Fit & Try) service. The admin panel lets the owner manage products directly — add, edit, and delete items from a secure, login-protected dashboard.",
+  "overview": "TBah is a bold, mobile-first e-commerce platform for Gen Z. Features multi-seller support, a \"Try At Home\" experience, category-driven shopping with box-opening effects, customer order management, coupon discounts, a models showcase, and a full admin panel.",
   "features": [
-    "Admin dashboard with product table (name, price, category, stock)",
-    "Add new products with a full form including image preview",
-    "Edit existing products with pre-filled form values",
-    "Delete products with confirmation modal",
-    "Login-protected admin area via Internet Identity",
-    "Instant product list refresh after any change",
-    "Product grid with TikTok-style cards",
-    "Try At Home (Fit & Try) at-home service",
-    "Same-day delivery with badges",
-    "Cash on delivery checkout"
+    "Multi-seller marketplace with order accept/reject and delivery choice",
+    "Category shopping with box-opening accordion effect (Men, Women, Handicrafts, Other)",
+    "Coupon system with discount amount shown at checkout",
+    "Models showcase gallery with single-photo full-width display",
+    "Customer login and order history with cancel anytime",
+    "Admin panel: manage sellers, products, coupons, trending, models",
+    "Cash on delivery with immediate order placement",
+    "Image performance: lazy loading, skeleton placeholders, persistent cache"
   ],
   "category": "e-commerce",
   "tags": [
-    "e-commerce",
+    "ecommerce",
+    "fashion",
     "gen-z",
-    "admin-panel",
-    "product-management",
-    "try-at-home",
-    "same-day-delivery"
+    "multi-seller",
+    "mobile-first",
+    "tbah"
   ],
-  "last_updated": "2026-04-16T17:24:49.779Z"
+  "last_updated": "2026-04-27T17:53:05.267Z"
 }

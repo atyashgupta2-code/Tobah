@@ -1,14 +1,22 @@
 type Timestamp = int;
 type SellerInput = 
  record {
+   address: text;
    businessName: text;
    email: text;
    name: text;
    phone: text;
  };
 type SellerId = text;
+type SellerEarnings = 
+ record {
+   orderCount: nat;
+   productBreakdown: vec ProductEarningBreakdown;
+   totalEarnings: nat;
+ };
 type Seller = 
  record {
+   address: text;
    businessName: text;
    createdAt: int;
    email: text;
@@ -26,6 +34,7 @@ type ProductInput =
    hasFitAndTry: bool;
    hasSameDayDelivery: bool;
    imageUrl: text;
+   isTrending: bool;
    name: text;
    price: nat;
    sellerId: text;
@@ -34,9 +43,17 @@ type ProductInput =
    stock: nat;
  };
 type ProductId = text;
+type ProductEarningBreakdown = 
+ record {
+   orderCount: nat;
+   productId: text;
+   productName: text;
+   totalRevenue: nat;
+ };
 type Product = 
  record {
    category: text;
+   createdAt: int;
    description: text;
    fulfillmentBy: FulfillmentBy;
    gender: text;
@@ -44,6 +61,7 @@ type Product =
    hasSameDayDelivery: bool;
    id: ProductId;
    imageUrl: text;
+   isTrending: bool;
    name: text;
    orderCount: nat;
    price: nat;
@@ -59,20 +77,27 @@ type PaymentMethod =
  };
 type OrderStatus = 
  variant {
+   Accepted;
    Cancelled;
    Confirmed;
    Delivered;
    Pending;
+   Placed;
    Processing;
+   Rejected;
    Shipped;
  };
 type OrderId = text;
 type Order = 
  record {
+   couponCode: opt text;
    createdAt: Timestamp;
+   customerId: CustomerId;
    customerName: text;
    customerPhone: text;
    deliveryOption: DeliveryOption;
+   discountAmount: opt nat;
+   fulfillmentChoice: opt FulfillmentBy;
    id: OrderId;
    items: vec CartItem;
    paymentMethod: PaymentMethod;
@@ -89,6 +114,14 @@ type Notification =
    message: text;
    orderId: opt text;
    sellerId: opt text;
+ };
+type ModelPhotoId = text;
+type ModelPhoto = 
+ record {
+   caption: opt text;
+   createdAt: Timestamp;
+   id: ModelPhotoId;
+   imageUrl: text;
  };
 type Measurements = 
  record {
@@ -114,6 +147,30 @@ type DeliveryOption =
    SameDay;
    Standard;
  };
+type CustomerId = text;
+type Customer = 
+ record {
+   createdAt: Timestamp;
+   id: CustomerId;
+   name: text;
+   phone: text;
+ };
+type CouponInput = 
+ record {
+   code: text;
+   description: text;
+   discountPercent: nat;
+ };
+type CouponId = text;
+type Coupon = 
+ record {
+   code: text;
+   createdAt: Timestamp;
+   description: text;
+   discountPercent: nat;
+   id: CouponId;
+   isActive: bool;
+ };
 type CartItem = 
  record {
    deliveryOption: DeliveryOption;
@@ -122,20 +179,50 @@ type CartItem =
    selectedSize: text;
  };
 service : {
+  acceptOrder: (orderId: OrderId, fulfillmentChoice: FulfillmentBy,
+   sellerName: text) -> (variant {
+                           err: text;
+                           ok: Order;
+                         });
+  addModelPhoto: (imageUrl: text, caption: opt text) ->
+   (variant {
+      err: text;
+      ok: ModelPhoto;
+    });
   addNotification: (message: text, sellerId: opt text, orderId: opt text) ->
    (text);
-  cancelOrder: (id: OrderId) -> (bool);
+  cancelOrder: (id: OrderId) -> (variant {
+                                   err: text;
+                                   ok;
+                                 });
+  createCoupon: (input: CouponInput) -> (variant {
+                                           err: text;
+                                           ok: Coupon;
+                                         });
   createOrder: (items: vec CartItem, shippingAddress: text, deliveryOption:
    DeliveryOption, paymentMethod: PaymentMethod, customerName: text,
-   customerPhone: text) -> (Order);
+   customerPhone: text, customerId: CustomerId, couponCode: opt text) ->
+   (Order);
   createProduct: (input: ProductInput) -> (variant {
                                              err: text;
                                              ok: Product;
+                                           });
+  deleteCoupon: (id: CouponId) -> (variant {
+                                     err: text;
+                                     ok;
+                                   });
+  deleteModelPhoto: (id: ModelPhotoId) -> (variant {
+                                             err: text;
+                                             ok;
                                            });
   deleteProduct: (id: ProductId) -> (variant {
                                        err: text;
                                        ok;
                                      });
+  getAllNotifications: () -> (vec Notification) query;
+  getCoupon: (code: text) -> (opt Coupon) query;
+  getCustomer: (phone: text) -> (opt Customer) query;
+  getNewArrivals: () -> (vec Product) query;
   getNotifications: (sellerId: opt text) -> (vec Notification) query;
   getOrder: (id: OrderId) -> (opt Order) query;
   getProduct: (id: ProductId) -> (opt Product) query;
@@ -143,18 +230,38 @@ service : {
   getProductsBySeller: (sellerId: text) -> (vec Product) query;
   getSeller: (id: SellerId) -> (opt Seller) query;
   getSellerByEmailOrPhone: (email: text, phone: text) -> (opt Seller) query;
+  getSellerEarnings: (sellerId: text) -> (SellerEarnings) query;
+  listCoupons: () -> (vec Coupon) query;
+  listModelPhotos: () -> (vec ModelPhoto) query;
   listOrders: () -> (vec record {
                            OrderId;
                            Order;
                          }) query;
+  listOrdersByCustomer: (phone: text) -> (vec Order) query;
+  listOrdersBySeller: (sellerId: text) -> (vec Order) query;
   listSellers: () -> (vec Seller) query;
   markNotificationRead: (notificationId: text) -> (bool);
+  registerCustomer: (name: text, phone: text) -> (Customer);
   registerSeller: (input: SellerInput) -> (variant {
                                              err: text;
                                              ok: Seller;
                                            });
+  rejectOrder: (orderId: OrderId, sellerName: text) ->
+   (variant {
+      err: text;
+      ok: Order;
+    });
   removeSeller: (sellerId: SellerId) -> (bool);
+  setProductTrending: (productId: ProductId, trending: bool) ->
+   (variant {
+      err: text;
+      ok: Product;
+    });
   submitFitAndTryRequest: (req: FitAndTryRequest) -> (text);
+  toggleCoupon: (id: CouponId) -> (variant {
+                                     err: text;
+                                     ok: Coupon;
+                                   });
   updateOrderStatus: (id: OrderId, newStatus: OrderStatus) ->
    (variant {
       err: text;

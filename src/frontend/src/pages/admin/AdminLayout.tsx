@@ -10,6 +10,7 @@ import {
   Package,
   ShieldCheck,
   ShoppingBag,
+  Sparkles,
 } from "lucide-react";
 
 interface AdminLayoutProps {
@@ -19,6 +20,7 @@ interface AdminLayoutProps {
 const navItems = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/admin/orders", label: "Orders", icon: ShoppingBag, exact: false },
+  { to: "/admin/models", label: "Models", icon: Sparkles, exact: false },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
@@ -176,7 +178,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             Products
           </Link>
         </nav>
-
         {/* Logout */}
         <div className="px-3 py-4 border-t border-border">
           <button
@@ -238,6 +239,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             aria-label="Products"
           >
             <Package size={18} />
+          </Link>
+          <Link
+            to="/admin/models"
+            data-ocid="admin.mobile_nav.models_link"
+            className={cn(
+              "p-2 rounded-lg transition-smooth",
+              isActive("/admin/models", false)
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            aria-label="Models"
+          >
+            <Sparkles size={18} />
           </Link>
           <button
             type="button"

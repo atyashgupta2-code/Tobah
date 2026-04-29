@@ -36,7 +36,6 @@ interface FormState {
   gender: string;
   hasSameDayDelivery: boolean;
   hasFitAndTry: boolean;
-  fulfillmentBy: FulfillmentBy;
 }
 
 const defaultForm: FormState = {
@@ -50,7 +49,6 @@ const defaultForm: FormState = {
   gender: "Unisex",
   hasSameDayDelivery: false,
   hasFitAndTry: false,
-  fulfillmentBy: FulfillmentBy.SellerFulfilled,
 };
 
 function FieldError({ message, id }: { message?: string; id: string }) {
@@ -64,20 +62,8 @@ function FieldError({ message, id }: { message?: string; id: string }) {
 
 type UploadState = "idle" | "uploading" | "done" | "error";
 
-const GENDERS = ["Men", "Women", "Unisex"] as const;
-
-const FULFILLMENT_OPTIONS = [
-  {
-    value: FulfillmentBy.SellerFulfilled,
-    label: "Fulfilled by Seller",
-    description: "You handle packing and delivery",
-  },
-  {
-    value: FulfillmentBy.AdminFulfilled,
-    label: "Fulfilled by Admin",
-    description: "TBah team handles delivery",
-  },
-] as const;
+// Extended genders including Handicrafts and Other
+const GENDERS = ["Men", "Women", "Unisex", "Handicrafts", "Other"] as const;
 
 export default function SellerProductForm() {
   const navigate = useNavigate();
@@ -113,7 +99,7 @@ export default function SellerProductForm() {
       setForm({
         name: existingProduct.name,
         description: existingProduct.description,
-        price: String(Number(existingProduct.price)),
+        price: String(Number(existingProduct.price) / 100),
         imageUrl: existingProduct.imageUrl,
         category: existingProduct.category,
         sizes: existingProduct.sizes.join(", "),
@@ -121,17 +107,12 @@ export default function SellerProductForm() {
         gender: existingProduct.gender || "Unisex",
         hasSameDayDelivery: existingProduct.hasSameDayDelivery,
         hasFitAndTry: existingProduct.hasFitAndTry,
-        fulfillmentBy:
-          existingProduct.fulfillmentBy ?? FulfillmentBy.SellerFulfilled,
       });
       if (existingProduct.imageUrl) setPreviewSrc(existingProduct.imageUrl);
     }
   }, [isEdit, existingProduct]);
 
-  function set(
-    field: keyof FormState,
-    value: string | boolean | FulfillmentBy,
-  ) {
+  function set(field: keyof FormState, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
@@ -194,10 +175,12 @@ export default function SellerProductForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+    // Delivery fulfillment is NOT chosen at listing time — seller picks it when accepting an order.
+    // Default to AdminFulfilled as a neutral placeholder; the real choice happens at order acceptance.
     const input: ProductInput = {
       name: form.name.trim(),
       description: form.description.trim(),
-      price: BigInt(Math.round(Number.parseFloat(form.price))),
+      price: BigInt(Math.round(Number.parseFloat(form.price) * 100)),
       imageUrl: form.imageUrl.trim(),
       category: form.category.trim(),
       sizes: form.sizes
@@ -210,7 +193,8 @@ export default function SellerProductForm() {
       hasFitAndTry: form.hasFitAndTry,
       sellerId,
       sellerName,
-      fulfillmentBy: form.fulfillmentBy,
+      fulfillmentBy: FulfillmentBy.AdminFulfilled,
+      isTrending: false,
     };
     try {
       if (isEdit) {
@@ -353,7 +337,7 @@ export default function SellerProductForm() {
               data-ocid="seller.product_form.category_input"
               value={form.category}
               onChange={(e) => set("category", e.target.value)}
-              placeholder="e.g. T-Shirts, Hoodies, Trousers"
+              placeholder="e.g. T-Shirts, Hoodies, Handmade Pottery"
             />
           </div>
 
@@ -365,16 +349,16 @@ export default function SellerProductForm() {
               data-ocid="seller.product_form.sizes_input"
               value={form.sizes}
               onChange={(e) => set("sizes", e.target.value)}
-              placeholder="e.g. XS, S, M, L, XL, XXL"
+              placeholder="e.g. XS, S, M, L, XL, XXL or One Size"
             />
             <p className="text-xs text-muted-foreground">
               Separate each size with a comma
             </p>
           </div>
 
-          {/* Gender */}
+          {/* Gender / Category */}
           <div className="space-y-2">
-            <Label>Gender *</Label>
+            <Label>Category *</Label>
             <div className="flex gap-2 flex-wrap">
               {GENDERS.map((g) => (
                 <button
@@ -394,30 +378,18 @@ export default function SellerProductForm() {
             </div>
           </div>
 
-          {/* Fulfillment by */}
-          <div className="space-y-2">
-            <Label>Delivery Fulfilled By *</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {FULFILLMENT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  data-ocid={`seller.product_form.fulfillment_${opt.value.toLowerCase()}`}
-                  onClick={() => set("fulfillmentBy", opt.value)}
-                  className={`p-3 rounded-xl text-left border transition-smooth ${
-                    form.fulfillmentBy === opt.value
-                      ? "bg-primary/10 border-primary text-foreground"
-                      : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                  }`}
-                >
-                  <p className="font-semibold text-sm">{opt.label}</p>
-                  <p className="text-xs mt-0.5 opacity-70">{opt.description}</p>
-                </button>
-              ))}
+          {/* Delivery note — informational only */}
+          <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 flex items-start gap-3">
+            <span className="text-lg shrink-0 mt-0.5">🚚</span>
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Delivery method chosen at order time
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                When a customer places an order, you'll choose whether you or
+                TBah Admin handles the delivery.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Choose who handles delivery for this product.
-            </p>
           </div>
 
           {/* Product Image */}
@@ -584,7 +556,7 @@ export default function SellerProductForm() {
                 onCheckedChange={(checked) => set("hasFitAndTry", !!checked)}
               />
               <Label htmlFor="pf-fitAndTry" className="cursor-pointer text-sm">
-                🏠 Enable Fit & Try at Home
+                🏠 Enable Fit &amp; Try at Home
               </Label>
             </div>
           </div>

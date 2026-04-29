@@ -1,139 +1,151 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { useActor } from "@caffeineai/core-infrastructure";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Bell,
-  CheckCheck,
+  CheckCircle2,
+  ClipboardList,
   Edit2,
+  LayoutDashboard,
   Package,
   Plus,
   Trash2,
+  TrendingUp,
   Truck,
   Users,
-  X,
+  XCircle,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { Notification, Product } from "../../backend.d";
-import { FulfillmentBy } from "../../backend.d";
+import { createActor } from "../../backend";
+import type { Order, Product, SellerEarnings } from "../../backend.d";
+import { FulfillmentBy, OrderStatus } from "../../backend.d";
 import {
-  useGetSellerNotifications,
-  useMarkNotificationRead,
+  useAcceptOrder,
+  useListOrdersBySeller,
+  useRejectOrder,
   useSellerDeleteProduct,
   useSellerProducts,
 } from "../../hooks/useSeller";
 
-function formatTimestamp(ts: bigint): string {
-  const ms = Number(ts) / 1_000_000;
-  const date = new Date(ms);
-  if (Number.isNaN(date.getTime())) return "";
-  const now = Date.now();
-  const diff = now - date.getTime();
-  if (diff < 60_000) return "Just now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return date.toLocaleDateString();
+// ─── Earnings hook ───────────────────────────────────────────────────────────
+
+function useSellerEarnings(sellerId: string) {
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery<SellerEarnings>({
+    queryKey: ["seller-earnings", sellerId],
+    queryFn: async () => {
+      if (!actor || !sellerId) {
+        return { totalEarnings: 0n, orderCount: 0n, productBreakdown: [] };
+      }
+      return actor.getSellerEarnings(sellerId);
+    },
+    enabled: !!actor && !isFetching && !!sellerId,
+    staleTime: 1000 * 60,
+  });
 }
 
-function NotificationPanel({
-  notifications,
-  sellerId,
-  onClose,
-}: {
-  notifications: Notification[];
-  sellerId: string;
-  onClose: () => void;
-}) {
-  const markRead = useMarkNotificationRead();
-  const panelRef = useRef<HTMLDivElement>(null);
+// ─── Earnings Summary ────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose]);
-
-  async function handleMarkRead(notificationId: string) {
-    try {
-      await markRead.mutateAsync({ notificationId, sellerId });
-    } catch {
-      // silent
-    }
-  }
+function EarningsSummary({ sellerId }: { sellerId: string }) {
+  const { data: earnings, isLoading } = useSellerEarnings(sellerId);
+  const totalEarnings = earnings ? Number(earnings.totalEarnings) / 100 : 0;
+  const orderCount = earnings ? Number(earnings.orderCount) : 0;
 
   return (
     <div
-      ref={panelRef}
-      data-ocid="seller.notifications.panel"
-      className="absolute top-full right-0 mt-2 w-80 bg-card border border-border rounded-2xl shadow-elevated z-50 overflow-hidden"
+      data-ocid="seller.earnings.section"
+      className="rounded-2xl border overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, oklch(0.18 0.04 315 / 0.6), oklch(0.16 0.02 280))",
+        borderColor: "oklch(0.62 0.28 315 / 0.3)",
+      }}
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="font-semibold text-sm text-foreground">
-          Notifications
+      <div
+        className="px-5 py-3 flex items-center gap-2 border-b"
+        style={{ borderColor: "oklch(0.62 0.28 315 / 0.2)" }}
+      >
+        <TrendingUp size={16} className="text-primary" />
+        <span className="font-display font-black text-sm text-foreground uppercase tracking-wide">
+          Earnings Summary
         </span>
-        <button
-          type="button"
-          data-ocid="seller.notifications.close_button"
-          onClick={onClose}
-          className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-smooth"
-          aria-label="Close notifications"
-        >
-          <X size={14} />
-        </button>
       </div>
-
-      <div className="max-h-80 overflow-y-auto divide-y divide-border">
-        {notifications.length === 0 ? (
-          <div
-            data-ocid="seller.notifications.empty_state"
-            className="py-10 text-center text-sm text-muted-foreground"
-          >
-            <Bell size={28} className="mx-auto mb-2 opacity-40" />
-            No notifications yet
-          </div>
-        ) : (
-          notifications.map((n, i) => (
-            <div
-              key={n.id}
-              data-ocid={`seller.notifications.item.${i + 1}`}
-              className={`px-4 py-3 flex items-start gap-3 transition-smooth ${
-                n.isRead ? "opacity-60" : "bg-primary/5"
-              }`}
+      <div className="grid grid-cols-2 divide-x divide-border/40">
+        <div className="px-5 py-4 text-center">
+          {isLoading ? (
+            <Skeleton className="h-8 w-20 mx-auto rounded-lg mb-1" />
+          ) : (
+            <p
+              className="font-display font-black text-2xl"
+              data-ocid="seller.earnings.total"
+              style={{ color: "oklch(0.75 0.22 65)" }}
             >
-              <div
-                className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${n.isRead ? "bg-muted-foreground/40" : "bg-primary"}`}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground leading-snug">
-                  {n.message}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatTimestamp(n.createdAt)}
-                </p>
-              </div>
-              {!n.isRead && (
-                <button
-                  type="button"
-                  data-ocid={`seller.notifications.mark_read_button.${i + 1}`}
-                  onClick={() => handleMarkRead(n.id)}
-                  className="shrink-0 p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-smooth"
-                  aria-label="Mark as read"
-                >
-                  <CheckCheck size={13} />
-                </button>
-              )}
-            </div>
-          ))
-        )}
+              ₹{totalEarnings.toLocaleString("en-IN")}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-0.5">
+            Total Earned
+          </p>
+        </div>
+        <div className="px-5 py-4 text-center">
+          {isLoading ? (
+            <Skeleton className="h-8 w-12 mx-auto rounded-lg mb-1" />
+          ) : (
+            <p
+              className="font-display font-black text-2xl text-primary"
+              data-ocid="seller.earnings.order_count"
+            >
+              {orderCount}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-0.5">
+            Orders Fulfilled
+          </p>
+        </div>
       </div>
+      {!isLoading && earnings && earnings.productBreakdown.length > 0 && (
+        <div
+          className="px-4 pb-4 pt-2 border-t"
+          style={{ borderColor: "oklch(0.62 0.28 315 / 0.15)" }}
+        >
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">
+            By Product
+          </p>
+          <div className="space-y-2">
+            {earnings.productBreakdown.slice(0, 5).map((item, i) => (
+              <div
+                key={item.productId}
+                data-ocid={`seller.earnings.breakdown.item.${i + 1}`}
+                className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-muted/30"
+              >
+                <p className="text-xs font-semibold text-foreground truncate flex-1 min-w-0">
+                  {item.productName}
+                </p>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    {Number(item.orderCount)} orders
+                  </span>
+                  <span
+                    className="text-xs font-black"
+                    style={{ color: "oklch(0.75 0.22 65)" }}
+                  >
+                    ₹{(Number(item.totalRevenue) / 100).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// ─── Product Row ─────────────────────────────────────────────────────────────
 
 function ProductRow({
   product,
@@ -156,7 +168,6 @@ function ProductRow({
       data-ocid={`seller.dashboard.product_item.${index}`}
       className="flex items-center gap-3 p-3 bg-muted/30 border border-border rounded-xl"
     >
-      {/* Thumbnail */}
       <div className="shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-muted border border-border">
         {product.imageUrl ? (
           <img
@@ -173,15 +184,13 @@ function ProductRow({
           </div>
         )}
       </div>
-
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm text-foreground truncate">
           {product.name}
         </p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="text-primary font-bold text-sm">
-            PKR {Number(product.price).toLocaleString()}
+            ₹{(Number(product.price) / 100).toLocaleString()}
           </span>
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
             {product.gender || "Unisex"}
@@ -193,7 +202,6 @@ function ProductRow({
             Orders: {Number(product.orderCount)}
           </span>
         </div>
-        {/* Fulfillment badge */}
         <div className="mt-1">
           <span
             data-ocid={`seller.dashboard.fulfillment_badge.${index}`}
@@ -208,8 +216,6 @@ function ProductRow({
           </span>
         </div>
       </div>
-
-      {/* Actions */}
       <div className="shrink-0 flex items-center gap-1">
         <Button
           variant="ghost"
@@ -237,17 +243,447 @@ function ProductRow({
   );
 }
 
+// ─── Status badge ─────────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  [OrderStatus.Placed]: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+  [OrderStatus.Pending]:
+    "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
+  [OrderStatus.Confirmed]: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  [OrderStatus.Processing]: "bg-blue-600/15 text-blue-300 border-blue-600/30",
+  [OrderStatus.Accepted]:
+    "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  [OrderStatus.Shipped]:
+    "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  [OrderStatus.Delivered]: "bg-green-500/15 text-green-400 border-green-500/30",
+  [OrderStatus.Cancelled]:
+    "bg-destructive/15 text-destructive border-destructive/30",
+  [OrderStatus.Rejected]: "bg-red-600/15 text-red-400 border-red-600/30",
+};
+
+// ─── Order Card for seller ────────────────────────────────────────────────────
+
+type AcceptStep = "idle" | "chooseFulfillment";
+
+function SellerOrderCard({
+  order,
+  index,
+  sellerId,
+  sellerName,
+}: {
+  order: Order;
+  index: number;
+  sellerId: string;
+  sellerName: string;
+}) {
+  const acceptOrder = useAcceptOrder();
+  const rejectOrder = useRejectOrder();
+  const [acceptStep, setAcceptStep] = useState<AcceptStep>("idle");
+  const [fulfillmentChoice, setFulfillmentChoice] = useState<FulfillmentBy>(
+    FulfillmentBy.SellerFulfilled,
+  );
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const shortId = order.id.slice(0, 8).toUpperCase();
+  const statusClass =
+    STATUS_COLORS[order.status] ??
+    "bg-muted/40 text-muted-foreground border-border";
+
+  const canAct =
+    order.status === OrderStatus.Placed || order.status === OrderStatus.Pending;
+
+  async function handleAccept() {
+    try {
+      await acceptOrder.mutateAsync({
+        orderId: order.id,
+        fulfillmentChoice,
+        sellerName,
+        sellerId,
+      });
+      toast.success("Order accepted! Admin has been notified.");
+      setAcceptStep("idle");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to accept");
+    }
+  }
+
+  async function handleReject() {
+    try {
+      await rejectOrder.mutateAsync({
+        orderId: order.id,
+        sellerName,
+        sellerId,
+      });
+      toast.success("Order rejected. Admin has been notified.");
+      setShowRejectConfirm(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reject");
+    }
+  }
+
+  return (
+    <div
+      data-ocid={`seller.orders.item.${index}`}
+      className="bg-card border border-border rounded-2xl overflow-hidden"
+    >
+      {/* Summary row */}
+      <div className="p-4 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">
+                #{shortId}
+              </span>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${statusClass}`}
+              >
+                {order.status}
+              </span>
+            </div>
+            <p className="font-bold text-sm text-foreground">
+              {order.customerName || "Customer"}
+            </p>
+            {order.customerPhone && (
+              <p className="text-xs text-muted-foreground">
+                📞 {order.customerPhone}
+              </p>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <p className="font-mono font-black text-base text-foreground">
+              ₹{(Number(order.total) / 100).toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {order.items.length} item{order.items.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        {/* Items summary */}
+        <button
+          type="button"
+          data-ocid={`seller.orders.expand_button.${index}`}
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-primary hover:underline text-left"
+        >
+          {expanded ? "Hide items ▲" : "View items ▼"}
+        </button>
+
+        {expanded && (
+          <div className="space-y-2 pt-1">
+            {order.items.map((item, i) => (
+              <div
+                key={`${item.productId}-${i}`}
+                data-ocid={`seller.orders.order_item.${index}.${i + 1}`}
+                className="flex items-center gap-2 bg-muted/30 rounded-lg p-2"
+              >
+                <Package size={14} className="text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">
+                    Product: {item.productId.slice(0, 8)}…
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Size: {item.selectedSize} · Qty: {Number(item.quantity)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {order.shippingAddress && (
+              <p className="text-xs text-muted-foreground pt-1">
+                📍 {order.shippingAddress.slice(0, 80)}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Action area */}
+        {canAct && (
+          <div className="pt-2 space-y-2">
+            {/* Reject confirm */}
+            {showRejectConfirm && (
+              <div
+                data-ocid={`seller.orders.reject_confirm.${index}`}
+                className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 space-y-2"
+              >
+                <p className="text-sm font-semibold text-destructive text-center">
+                  Reject this order?
+                </p>
+                <p className="text-xs text-muted-foreground text-center">
+                  Admin will be notified. Customer won't be told by whom.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    data-ocid={`seller.orders.confirm_reject_button.${index}`}
+                    disabled={rejectOrder.isPending}
+                    onClick={handleReject}
+                    className="flex-1 h-8 text-xs gap-1.5"
+                  >
+                    <XCircle size={13} />
+                    Yes, Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-ocid={`seller.orders.cancel_reject_button.${index}`}
+                    onClick={() => setShowRejectConfirm(false)}
+                    className="flex-1 h-8 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Fulfillment choice */}
+            {acceptStep === "chooseFulfillment" && (
+              <div
+                data-ocid={`seller.orders.fulfillment_choice.${index}`}
+                className="bg-card border border-border rounded-xl p-3 space-y-3"
+              >
+                <p className="text-sm font-semibold text-foreground text-center">
+                  Who handles delivery?
+                </p>
+                <div className="space-y-2">
+                  {[
+                    {
+                      value: FulfillmentBy.SellerFulfilled,
+                      label: "I'll handle it",
+                      desc: "You pack and deliver",
+                      icon: "🚚",
+                    },
+                    {
+                      value: FulfillmentBy.AdminFulfilled,
+                      label: "TBah handles it",
+                      desc: "Admin delivers on your behalf",
+                      icon: "📦",
+                    },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      data-ocid={`seller.orders.fulfillment_${opt.value.toLowerCase()}.${index}`}
+                      onClick={() => setFulfillmentChoice(opt.value)}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-2.5 rounded-lg border text-left transition-smooth",
+                        fulfillmentChoice === opt.value
+                          ? "bg-primary/10 border-primary"
+                          : "bg-muted/30 border-border hover:border-primary/40",
+                      )}
+                    >
+                      <span className="text-lg">{opt.icon}</span>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {opt.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {opt.desc}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    data-ocid={`seller.orders.confirm_accept_button.${index}`}
+                    disabled={acceptOrder.isPending}
+                    onClick={handleAccept}
+                    className="btn-primary flex-1 h-8 text-xs gap-1.5"
+                  >
+                    <CheckCircle2 size={13} />
+                    {acceptOrder.isPending ? "Accepting…" : "Confirm Accept"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-ocid={`seller.orders.cancel_accept_button.${index}`}
+                    onClick={() => setAcceptStep("idle")}
+                    className="h-8 text-xs"
+                  >
+                    Back
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Main Accept / Reject */}
+            {acceptStep === "idle" && !showRejectConfirm && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  data-ocid={`seller.orders.accept_button.${index}`}
+                  onClick={() => setAcceptStep("chooseFulfillment")}
+                  className="flex-1 h-8 text-xs gap-1.5 bg-green-600 hover:bg-green-500 text-white border-0"
+                >
+                  <CheckCircle2 size={13} />
+                  Accept Order
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  data-ocid={`seller.orders.reject_button.${index}`}
+                  onClick={() => setShowRejectConfirm(true)}
+                  className="flex-1 h-8 text-xs gap-1.5"
+                >
+                  <XCircle size={13} />
+                  Reject
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Seller Orders Section ────────────────────────────────────────────────────
+
+function SellerOrdersSection({
+  sellerId,
+  sellerName,
+}: {
+  sellerId: string;
+  sellerName: string;
+}) {
+  const {
+    data: orders = [],
+    isLoading,
+    refetch,
+  } = useListOrdersBySeller(sellerId);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const pendingCount = orders.filter(
+    (o) => o.status === OrderStatus.Placed || o.status === OrderStatus.Pending,
+  ).length;
+
+  const filtered =
+    statusFilter === "all"
+      ? orders
+      : orders.filter((o) => o.status === statusFilter);
+
+  const filterOptions = [
+    { value: "all", label: "All Orders" },
+    { value: OrderStatus.Placed, label: "New" },
+    { value: OrderStatus.Accepted, label: "Accepted" },
+    { value: OrderStatus.Rejected, label: "Rejected" },
+    { value: OrderStatus.Delivered, label: "Delivered" },
+    { value: OrderStatus.Cancelled, label: "Cancelled" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display font-bold text-lg text-foreground">
+            My Orders
+          </h2>
+          {pendingCount > 0 && (
+            <p className="text-xs text-amber-400 font-semibold mt-0.5 animate-pulse">
+              ⚡ {pendingCount} order{pendingCount > 1 ? "s" : ""} need your
+              action
+            </p>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          data-ocid="seller.orders.refresh_button"
+          onClick={() => refetch()}
+          className="text-xs gap-1.5"
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {/* Filter pills */}
+      <div className="flex gap-1.5 flex-wrap">
+        {filterOptions.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            data-ocid={`seller.orders.filter.${opt.value}`}
+            onClick={() => setStatusFilter(opt.value)}
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-bold transition-smooth border",
+              statusFilter === opt.value
+                ? "bg-primary/15 text-primary border-primary/40"
+                : "bg-muted/30 text-muted-foreground border-transparent hover:border-border",
+            )}
+          >
+            {opt.label}
+            {opt.value === "all" && orders.length > 0 && (
+              <span className="ml-1 text-[10px] bg-muted-foreground/20 rounded-full px-1">
+                {orders.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Orders list */}
+      {isLoading ? (
+        <div className="space-y-3" data-ocid="seller.orders.loading_state">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-2xl" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div
+          data-ocid="seller.orders.empty_state"
+          className="text-center py-16 bg-card border border-dashed border-border rounded-2xl"
+        >
+          <ClipboardList
+            size={40}
+            className="text-muted-foreground mx-auto mb-3"
+          />
+          <p className="font-semibold text-foreground mb-1">No orders yet</p>
+          <p className="text-sm text-muted-foreground">
+            {statusFilter === "all"
+              ? "Orders for your products will appear here"
+              : `No ${statusFilter.toLowerCase()} orders`}
+          </p>
+        </div>
+      ) : (
+        <div data-ocid="seller.orders.list" className="space-y-3">
+          {filtered.map((order, idx) => (
+            <SellerOrderCard
+              key={order.id}
+              order={order}
+              index={idx + 1}
+              sellerId={sellerId}
+              sellerName={sellerName}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main SellerDashboard ─────────────────────────────────────────────────────
+
+type SellerTab = "dashboard" | "orders";
+
 export default function SellerDashboard() {
   const navigate = useNavigate();
   const [sellerId, setSellerId] = useState<string>("");
   const [sellerName, setSellerName] = useState<string>("");
   const [businessName, setBusinessName] = useState<string>("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [activeTab, setActiveTab] = useState<SellerTab>("dashboard");
 
   const { data: products, isLoading } = useSellerProducts(sellerId);
-  const { data: notifications } = useGetSellerNotifications(sellerId);
+  const { data: orders = [] } = useListOrdersBySeller(sellerId);
   const deleteProduct = useSellerDeleteProduct();
+
+  const pendingOrderCount = orders.filter(
+    (o) => o.status === OrderStatus.Placed || o.status === OrderStatus.Pending,
+  ).length;
 
   useEffect(() => {
     const id = localStorage.getItem("tbah_seller_id");
@@ -274,8 +710,6 @@ export default function SellerDashboard() {
       setDeletingId(null);
     }
   }
-
-  const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
 
   if (!sellerId) return null;
 
@@ -305,149 +739,166 @@ export default function SellerDashboard() {
               </p>
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs text-muted-foreground shrink-0"
+            onClick={() => {
+              localStorage.removeItem("tbah_seller_id");
+              localStorage.removeItem("tbah_seller_name");
+              localStorage.removeItem("tbah_seller_business");
+              navigate({ to: "/seller/register" });
+            }}
+            data-ocid="seller.dashboard.logout_button"
+          >
+            Log out
+          </Button>
+        </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Notification bell */}
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                data-ocid="seller.dashboard.notifications_button"
-                onClick={() => setShowNotifications((v) => !v)}
-                className="h-9 w-9 relative text-muted-foreground hover:text-foreground"
-                aria-label="Notifications"
-              >
-                <Bell size={18} />
-                {unreadCount > 0 && (
-                  <span
-                    data-ocid="seller.dashboard.notification_count"
-                    className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-primary text-primary-foreground rounded-full text-[10px] font-bold flex items-center justify-center px-1"
+        {/* Tabs */}
+        <div className="flex gap-1 bg-muted/40 border border-border rounded-xl p-1">
+          <button
+            type="button"
+            data-ocid="seller.tab.dashboard"
+            onClick={() => setActiveTab("dashboard")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-smooth",
+              activeTab === "dashboard"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <LayoutDashboard size={15} />
+            Dashboard
+          </button>
+          <button
+            type="button"
+            data-ocid="seller.tab.orders"
+            onClick={() => setActiveTab("orders")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-smooth relative",
+              activeTab === "orders"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ClipboardList size={15} />
+            My Orders
+            {pendingOrderCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1 animate-pulse">
+                {pendingOrderCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Dashboard tab */}
+        {activeTab === "dashboard" && (
+          <>
+            {/* Earnings Summary */}
+            <EarningsSummary sellerId={sellerId} />
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-card border border-border rounded-xl p-4 text-center">
+                <p className="text-2xl font-black text-primary font-display">
+                  {isLoading ? "—" : (products?.length ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-0.5">
+                  Products Listed
+                </p>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-4 text-center">
+                <p className="text-2xl font-black text-accent font-display">
+                  {isLoading
+                    ? "—"
+                    : (products
+                        ?.reduce((s, p) => s + Number(p.stock), 0)
+                        .toLocaleString() ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-0.5">
+                  Total Stock
+                </p>
+              </div>
+            </div>
+
+            {/* Products */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-display font-bold text-lg text-foreground">
+                  My Products
+                </h2>
+                <Button
+                  data-ocid="seller.dashboard.add_product_button"
+                  onClick={() => navigate({ to: "/seller/products/new" })}
+                  className="btn-primary text-sm gap-2"
+                  size="sm"
+                >
+                  <Plus size={15} />
+                  Add Product
+                </Button>
+              </div>
+
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : !products || products.length === 0 ? (
+                <div
+                  data-ocid="seller.dashboard.empty_state"
+                  className="text-center py-16 bg-card border border-dashed border-border rounded-2xl"
+                >
+                  <Package
+                    size={40}
+                    className="text-muted-foreground mx-auto mb-3"
+                  />
+                  <p className="font-semibold text-foreground mb-1">
+                    No products yet
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Add your first product to start selling
+                  </p>
+                  <Button
+                    data-ocid="seller.dashboard.empty_add_button"
+                    onClick={() => navigate({ to: "/seller/products/new" })}
+                    className="btn-primary gap-2"
                   >
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Button>
-
-              {showNotifications && (
-                <NotificationPanel
-                  notifications={notifications ?? []}
-                  sellerId={sellerId}
-                  onClose={() => setShowNotifications(false)}
-                />
+                    <Plus size={16} />
+                    Add First Product
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  data-ocid="seller.dashboard.product_list"
+                  className="space-y-2"
+                >
+                  {products.map((product, index) => (
+                    <ProductRow
+                      key={product.id}
+                      product={product}
+                      index={index + 1}
+                      onEdit={() =>
+                        navigate({
+                          to: "/seller/products/$id/edit",
+                          params: { id: product.id },
+                        })
+                      }
+                      onDelete={() => handleDelete(product)}
+                      isDeleting={deletingId === product.id}
+                    />
+                  ))}
+                </div>
               )}
             </div>
+          </>
+        )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs text-muted-foreground"
-              onClick={() => {
-                localStorage.removeItem("tbah_seller_id");
-                localStorage.removeItem("tbah_seller_name");
-                localStorage.removeItem("tbah_seller_business");
-                navigate({ to: "/seller/register" });
-              }}
-              data-ocid="seller.dashboard.logout_button"
-            >
-              Log out
-            </Button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <p className="text-2xl font-black text-primary font-display">
-              {isLoading ? "—" : (products?.length ?? 0)}
-            </p>
-            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-0.5">
-              Products Listed
-            </p>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <p className="text-2xl font-black text-accent font-display">
-              {isLoading
-                ? "—"
-                : (products
-                    ?.reduce((s, p) => s + Number(p.stock), 0)
-                    .toLocaleString() ?? 0)}
-            </p>
-            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-0.5">
-              Total Stock
-            </p>
-          </div>
-        </div>
-
-        {/* Products */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold text-lg text-foreground">
-              My Products
-            </h2>
-            <Button
-              data-ocid="seller.dashboard.add_product_button"
-              onClick={() => navigate({ to: "/seller/products/new" })}
-              className="btn-primary text-sm gap-2"
-              size="sm"
-            >
-              <Plus size={15} />
-              Add Product
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-xl" />
-              ))}
-            </div>
-          ) : !products || products.length === 0 ? (
-            <div
-              data-ocid="seller.dashboard.empty_state"
-              className="text-center py-16 bg-card border border-dashed border-border rounded-2xl"
-            >
-              <Package
-                size={40}
-                className="text-muted-foreground mx-auto mb-3"
-              />
-              <p className="font-semibold text-foreground mb-1">
-                No products yet
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                Add your first product to start selling
-              </p>
-              <Button
-                data-ocid="seller.dashboard.empty_add_button"
-                onClick={() => navigate({ to: "/seller/products/new" })}
-                className="btn-primary gap-2"
-              >
-                <Plus size={16} />
-                Add First Product
-              </Button>
-            </div>
-          ) : (
-            <div
-              data-ocid="seller.dashboard.product_list"
-              className="space-y-2"
-            >
-              {products.map((product, index) => (
-                <ProductRow
-                  key={product.id}
-                  product={product}
-                  index={index + 1}
-                  onEdit={() =>
-                    navigate({
-                      to: "/seller/products/$id/edit",
-                      params: { id: product.id },
-                    })
-                  }
-                  onDelete={() => handleDelete(product)}
-                  isDeleting={deletingId === product.id}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Orders tab */}
+        {activeTab === "orders" && (
+          <SellerOrdersSection sellerId={sellerId} sellerName={sellerName} />
+        )}
       </div>
     </div>
   );

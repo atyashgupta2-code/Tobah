@@ -2,7 +2,9 @@ import { useActor } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createActor } from "../backend";
 import type {
+  FulfillmentBy,
   Notification,
+  Order,
   Product,
   ProductInput,
   Seller,
@@ -33,6 +35,7 @@ export function useRegisterSeller() {
         return { seller: existing, wasExisting: true };
       }
 
+      // SellerInput now includes address field
       const result = await actor.registerSeller(input);
       if (result.__kind__ === "err") throw new Error(result.err);
       const seller = result.ok;
@@ -147,6 +150,91 @@ export function useMarkNotificationRead() {
       }
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
+  });
+}
+
+/** Accept an order as a seller — includes fulfillment choice */
+export function useAcceptOrder() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<
+    Order,
+    Error,
+    {
+      orderId: string;
+      fulfillmentChoice: FulfillmentBy;
+      sellerName: string;
+      sellerId?: string;
+    }
+  >({
+    mutationFn: async ({ orderId, fulfillmentChoice, sellerName }) => {
+      if (!actor) throw new Error("Actor not ready");
+      const result = await actor.acceptOrder(
+        orderId,
+        fulfillmentChoice,
+        sellerName,
+      );
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+      if (variables.sellerId) {
+        queryClient.invalidateQueries({
+          queryKey: ["notifications", "seller", variables.sellerId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["seller-orders", variables.sellerId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+/** Reject an order as a seller */
+export function useRejectOrder() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<
+    Order,
+    Error,
+    { orderId: string; sellerName: string; sellerId?: string }
+  >({
+    mutationFn: async ({ orderId, sellerName }) => {
+      if (!actor) throw new Error("Actor not ready");
+      const result = await actor.rejectOrder(orderId, sellerName);
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+      if (variables.sellerId) {
+        queryClient.invalidateQueries({
+          queryKey: ["notifications", "seller", variables.sellerId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["seller-orders", variables.sellerId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+/** List orders for a seller by their sellerId */
+export function useListOrdersBySeller(sellerId: string) {
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery<Order[]>({
+    queryKey: ["seller-orders", sellerId],
+    queryFn: async () => {
+      if (!actor || !sellerId) return [];
+      return actor.listOrdersBySeller(sellerId);
+    },
+    enabled: !!actor && !isFetching && !!sellerId,
+    refetchInterval: 20_000,
   });
 }
 

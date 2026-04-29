@@ -93,8 +93,15 @@ export interface SellerInput {
     name: string;
     businessName: string;
     email: string;
+    address: string;
     phone: string;
 }
+export interface SellerEarnings {
+    productBreakdown: Array<ProductEarningBreakdown>;
+    orderCount: bigint;
+    totalEarnings: bigint;
+}
+export type Timestamp = bigint;
 export interface ProductInput {
     fulfillmentBy: FulfillmentBy;
     name: string;
@@ -109,13 +116,15 @@ export interface ProductInput {
     category: string;
     sellerId: string;
     price: bigint;
+    isTrending: boolean;
 }
-export type Timestamp = bigint;
-export interface FitAndTryRequest {
-    productId: ProductId;
-    measurements: Measurements;
-    preferredSize: string;
+export interface ProductEarningBreakdown {
+    productId: string;
+    productName: string;
+    orderCount: bigint;
+    totalRevenue: bigint;
 }
+export type ModelPhotoId = string;
 export interface Seller {
     id: SellerId;
     isApproved: boolean;
@@ -123,27 +132,52 @@ export interface Seller {
     createdAt: bigint;
     businessName: string;
     email: string;
+    address: string;
     phone: string;
 }
+export interface FitAndTryRequest {
+    productId: ProductId;
+    measurements: Measurements;
+    preferredSize: string;
+}
 export type SellerId = string;
+export interface Coupon {
+    id: CouponId;
+    code: string;
+    createdAt: Timestamp;
+    description: string;
+    discountPercent: bigint;
+    isActive: boolean;
+}
+export interface Order {
+    id: OrderId;
+    customerName: string;
+    status: OrderStatus;
+    couponCode?: string;
+    total: bigint;
+    paymentMethod: PaymentMethod;
+    customerPhone: string;
+    discountAmount?: bigint;
+    createdAt: Timestamp;
+    deliveryOption: DeliveryOption;
+    shippingAddress: string;
+    customerId: CustomerId;
+    items: Array<CartItem>;
+    fulfillmentChoice?: FulfillmentBy;
+}
 export interface Measurements {
     weight: bigint;
     height: bigint;
     chest: bigint;
     waist: bigint;
 }
-export interface Order {
-    id: OrderId;
-    customerName: string;
-    status: OrderStatus;
-    total: bigint;
-    paymentMethod: PaymentMethod;
-    customerPhone: string;
+export interface Customer {
+    id: CustomerId;
+    name: string;
     createdAt: Timestamp;
-    deliveryOption: DeliveryOption;
-    shippingAddress: string;
-    items: Array<CartItem>;
+    phone: string;
 }
+export type CustomerId = string;
 export type NotificationId = string;
 export interface Notification {
     id: NotificationId;
@@ -153,7 +187,19 @@ export interface Notification {
     message: string;
     sellerId?: string;
 }
+export interface ModelPhoto {
+    id: ModelPhotoId;
+    createdAt: Timestamp;
+    imageUrl: string;
+    caption?: string;
+}
+export interface CouponInput {
+    code: string;
+    description: string;
+    discountPercent: bigint;
+}
 export type ProductId = string;
+export type CouponId = string;
 export interface CartItem {
     productId: ProductId;
     deliveryOption: DeliveryOption;
@@ -164,6 +210,7 @@ export interface Product {
     id: ProductId;
     fulfillmentBy: FulfillmentBy;
     name: string;
+    createdAt: bigint;
     description: string;
     hasFitAndTry: boolean;
     sizes: Array<string>;
@@ -176,6 +223,7 @@ export interface Product {
     category: string;
     sellerId: string;
     price: bigint;
+    isTrending: boolean;
 }
 export type OrderId = string;
 export enum DeliveryOption {
@@ -190,6 +238,9 @@ export enum FulfillmentBy {
 export enum OrderStatus {
     Delivered = "Delivered",
     Confirmed = "Confirmed",
+    Placed = "Placed",
+    Rejected = "Rejected",
+    Accepted = "Accepted",
     Cancelled = "Cancelled",
     Processing = "Processing",
     Shipped = "Shipped",
@@ -200,12 +251,53 @@ export enum PaymentMethod {
     CashOnDelivery = "CashOnDelivery"
 }
 export interface backendInterface {
+    acceptOrder(orderId: OrderId, fulfillmentChoice: FulfillmentBy, sellerName: string): Promise<{
+        __kind__: "ok";
+        ok: Order;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    addModelPhoto(imageUrl: string, caption: string | null): Promise<{
+        __kind__: "ok";
+        ok: ModelPhoto;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     addNotification(message: string, sellerId: string | null, orderId: string | null): Promise<string>;
-    cancelOrder(id: OrderId): Promise<boolean>;
-    createOrder(items: Array<CartItem>, shippingAddress: string, deliveryOption: DeliveryOption, paymentMethod: PaymentMethod, customerName: string, customerPhone: string): Promise<Order>;
+    cancelOrder(id: OrderId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    createCoupon(input: CouponInput): Promise<{
+        __kind__: "ok";
+        ok: Coupon;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    createOrder(items: Array<CartItem>, shippingAddress: string, deliveryOption: DeliveryOption, paymentMethod: PaymentMethod, customerName: string, customerPhone: string, customerId: CustomerId, couponCode: string | null): Promise<Order>;
     createProduct(input: ProductInput): Promise<{
         __kind__: "ok";
         ok: Product;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    deleteCoupon(id: CouponId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    deleteModelPhoto(id: ModelPhotoId): Promise<{
+        __kind__: "ok";
+        ok: null;
     } | {
         __kind__: "err";
         err: string;
@@ -217,6 +309,10 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    getAllNotifications(): Promise<Array<Notification>>;
+    getCoupon(code: string): Promise<Coupon | null>;
+    getCustomer(phone: string): Promise<Customer | null>;
+    getNewArrivals(): Promise<Array<Product>>;
     getNotifications(sellerId: string | null): Promise<Array<Notification>>;
     getOrder(id: OrderId): Promise<Order | null>;
     getProduct(id: ProductId): Promise<Product | null>;
@@ -224,9 +320,15 @@ export interface backendInterface {
     getProductsBySeller(sellerId: string): Promise<Array<Product>>;
     getSeller(id: SellerId): Promise<Seller | null>;
     getSellerByEmailOrPhone(email: string, phone: string): Promise<Seller | null>;
+    getSellerEarnings(sellerId: string): Promise<SellerEarnings>;
+    listCoupons(): Promise<Array<Coupon>>;
+    listModelPhotos(): Promise<Array<ModelPhoto>>;
     listOrders(): Promise<Array<[OrderId, Order]>>;
+    listOrdersByCustomer(phone: string): Promise<Array<Order>>;
+    listOrdersBySeller(sellerId: string): Promise<Array<Order>>;
     listSellers(): Promise<Array<Seller>>;
     markNotificationRead(notificationId: string): Promise<boolean>;
+    registerCustomer(name: string, phone: string): Promise<Customer>;
     registerSeller(input: SellerInput): Promise<{
         __kind__: "ok";
         ok: Seller;
@@ -234,8 +336,29 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    rejectOrder(orderId: OrderId, sellerName: string): Promise<{
+        __kind__: "ok";
+        ok: Order;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     removeSeller(sellerId: SellerId): Promise<boolean>;
+    setProductTrending(productId: ProductId, trending: boolean): Promise<{
+        __kind__: "ok";
+        ok: Product;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     submitFitAndTryRequest(req: FitAndTryRequest): Promise<string>;
+    toggleCoupon(id: CouponId): Promise<{
+        __kind__: "ok";
+        ok: Coupon;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     updateOrderStatus(id: OrderId, newStatus: OrderStatus): Promise<{
         __kind__: "ok";
         ok: Order;
@@ -251,49 +374,115 @@ export interface backendInterface {
         err: string;
     }>;
 }
-import type { CartItem as _CartItem, DeliveryOption as _DeliveryOption, FulfillmentBy as _FulfillmentBy, Notification as _Notification, NotificationId as _NotificationId, Order as _Order, OrderId as _OrderId, OrderStatus as _OrderStatus, PaymentMethod as _PaymentMethod, Product as _Product, ProductId as _ProductId, ProductInput as _ProductInput, Seller as _Seller, Timestamp as _Timestamp } from "./declarations/backend.did.d.ts";
+import type { CartItem as _CartItem, Coupon as _Coupon, Customer as _Customer, CustomerId as _CustomerId, DeliveryOption as _DeliveryOption, FulfillmentBy as _FulfillmentBy, ModelPhoto as _ModelPhoto, ModelPhotoId as _ModelPhotoId, Notification as _Notification, NotificationId as _NotificationId, Order as _Order, OrderId as _OrderId, OrderStatus as _OrderStatus, PaymentMethod as _PaymentMethod, Product as _Product, ProductId as _ProductId, ProductInput as _ProductInput, Seller as _Seller, Timestamp as _Timestamp } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
+    async acceptOrder(arg0: OrderId, arg1: FulfillmentBy, arg2: string): Promise<{
+        __kind__: "ok";
+        ok: Order;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.acceptOrder(arg0, to_candid_FulfillmentBy_n1(this._uploadFile, this._downloadFile, arg1), arg2);
+                return from_candid_variant_n3(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.acceptOrder(arg0, to_candid_FulfillmentBy_n1(this._uploadFile, this._downloadFile, arg1), arg2);
+            return from_candid_variant_n3(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async addModelPhoto(arg0: string, arg1: string | null): Promise<{
+        __kind__: "ok";
+        ok: ModelPhoto;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addModelPhoto(arg0, to_candid_opt_n20(this._uploadFile, this._downloadFile, arg1));
+                return from_candid_variant_n21(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addModelPhoto(arg0, to_candid_opt_n20(this._uploadFile, this._downloadFile, arg1));
+            return from_candid_variant_n21(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async addNotification(arg0: string, arg1: string | null, arg2: string | null): Promise<string> {
         if (this.processError) {
             try {
-                const result = await this.actor.addNotification(arg0, to_candid_opt_n1(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n1(this._uploadFile, this._downloadFile, arg2));
+                const result = await this.actor.addNotification(arg0, to_candid_opt_n20(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n20(this._uploadFile, this._downloadFile, arg2));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.addNotification(arg0, to_candid_opt_n1(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n1(this._uploadFile, this._downloadFile, arg2));
+            const result = await this.actor.addNotification(arg0, to_candid_opt_n20(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n20(this._uploadFile, this._downloadFile, arg2));
             return result;
         }
     }
-    async cancelOrder(arg0: OrderId): Promise<boolean> {
+    async cancelOrder(arg0: OrderId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
                 const result = await this.actor.cancelOrder(arg0);
-                return result;
+                return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.cancelOrder(arg0);
-            return result;
+            return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
         }
     }
-    async createOrder(arg0: Array<CartItem>, arg1: string, arg2: DeliveryOption, arg3: PaymentMethod, arg4: string, arg5: string): Promise<Order> {
+    async createCoupon(arg0: CouponInput): Promise<{
+        __kind__: "ok";
+        ok: Coupon;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.createOrder(to_candid_vec_n2(this._uploadFile, this._downloadFile, arg0), arg1, to_candid_DeliveryOption_n5(this._uploadFile, this._downloadFile, arg2), to_candid_PaymentMethod_n7(this._uploadFile, this._downloadFile, arg3), arg4, arg5);
-                return from_candid_Order_n9(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.createCoupon(arg0);
+                return from_candid_variant_n25(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createOrder(to_candid_vec_n2(this._uploadFile, this._downloadFile, arg0), arg1, to_candid_DeliveryOption_n5(this._uploadFile, this._downloadFile, arg2), to_candid_PaymentMethod_n7(this._uploadFile, this._downloadFile, arg3), arg4, arg5);
-            return from_candid_Order_n9(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.createCoupon(arg0);
+            return from_candid_variant_n25(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async createOrder(arg0: Array<CartItem>, arg1: string, arg2: DeliveryOption, arg3: PaymentMethod, arg4: string, arg5: string, arg6: CustomerId, arg7: string | null): Promise<Order> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createOrder(to_candid_vec_n26(this._uploadFile, this._downloadFile, arg0), arg1, to_candid_DeliveryOption_n29(this._uploadFile, this._downloadFile, arg2), to_candid_PaymentMethod_n31(this._uploadFile, this._downloadFile, arg3), arg4, arg5, arg6, to_candid_opt_n20(this._uploadFile, this._downloadFile, arg7));
+                return from_candid_Order_n4(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createOrder(to_candid_vec_n26(this._uploadFile, this._downloadFile, arg0), arg1, to_candid_DeliveryOption_n29(this._uploadFile, this._downloadFile, arg2), to_candid_PaymentMethod_n31(this._uploadFile, this._downloadFile, arg3), arg4, arg5, arg6, to_candid_opt_n20(this._uploadFile, this._downloadFile, arg7));
+            return from_candid_Order_n4(this._uploadFile, this._downloadFile, result);
         }
     }
     async createProduct(arg0: ProductInput): Promise<{
@@ -305,14 +494,54 @@ export class Backend implements backendInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.actor.createProduct(to_candid_ProductInput_n20(this._uploadFile, this._downloadFile, arg0));
+                const result = await this.actor.createProduct(to_candid_ProductInput_n33(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_variant_n35(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createProduct(to_candid_ProductInput_n33(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_variant_n35(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async deleteCoupon(arg0: CouponId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteCoupon(arg0);
                 return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createProduct(to_candid_ProductInput_n20(this._uploadFile, this._downloadFile, arg0));
+            const result = await this.actor.deleteCoupon(arg0);
+            return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async deleteModelPhoto(arg0: ModelPhotoId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteModelPhoto(arg0);
+                return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteModelPhoto(arg0);
             return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -326,126 +555,252 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.deleteProduct(arg0);
-                return from_candid_variant_n29(this._uploadFile, this._downloadFile, result);
+                return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.deleteProduct(arg0);
-            return from_candid_variant_n29(this._uploadFile, this._downloadFile, result);
+            return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getNotifications(arg0: string | null): Promise<Array<Notification>> {
+    async getAllNotifications(): Promise<Array<Notification>> {
         if (this.processError) {
             try {
-                const result = await this.actor.getNotifications(to_candid_opt_n1(this._uploadFile, this._downloadFile, arg0));
-                return from_candid_vec_n30(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getNotifications(to_candid_opt_n1(this._uploadFile, this._downloadFile, arg0));
-            return from_candid_vec_n30(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getOrder(arg0: OrderId): Promise<Order | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getOrder(arg0);
-                return from_candid_opt_n34(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getOrder(arg0);
-            return from_candid_opt_n34(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getProduct(arg0: ProductId): Promise<Product | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getProduct(arg0);
-                return from_candid_opt_n35(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getProduct(arg0);
-            return from_candid_opt_n35(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getProducts(): Promise<Array<Product>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getProducts();
-                return from_candid_vec_n36(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getProducts();
-            return from_candid_vec_n36(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getProductsBySeller(arg0: string): Promise<Array<Product>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getProductsBySeller(arg0);
-                return from_candid_vec_n36(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getProductsBySeller(arg0);
-            return from_candid_vec_n36(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getSeller(arg0: SellerId): Promise<Seller | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getSeller(arg0);
-                return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getSeller(arg0);
-            return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getSellerByEmailOrPhone(arg0: string, arg1: string): Promise<Seller | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getSellerByEmailOrPhone(arg0, arg1);
-                return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getSellerByEmailOrPhone(arg0, arg1);
-            return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async listOrders(): Promise<Array<[OrderId, Order]>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.listOrders();
+                const result = await this.actor.getAllNotifications();
                 return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.listOrders();
+            const result = await this.actor.getAllNotifications();
             return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getCoupon(arg0: string): Promise<Coupon | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCoupon(arg0);
+                return from_candid_opt_n41(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCoupon(arg0);
+            return from_candid_opt_n41(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getCustomer(arg0: string): Promise<Customer | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCustomer(arg0);
+                return from_candid_opt_n42(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCustomer(arg0);
+            return from_candid_opt_n42(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getNewArrivals(): Promise<Array<Product>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getNewArrivals();
+                return from_candid_vec_n43(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getNewArrivals();
+            return from_candid_vec_n43(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getNotifications(arg0: string | null): Promise<Array<Notification>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getNotifications(to_candid_opt_n20(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getNotifications(to_candid_opt_n20(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getOrder(arg0: OrderId): Promise<Order | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getOrder(arg0);
+                return from_candid_opt_n44(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getOrder(arg0);
+            return from_candid_opt_n44(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getProduct(arg0: ProductId): Promise<Product | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getProduct(arg0);
+                return from_candid_opt_n45(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getProduct(arg0);
+            return from_candid_opt_n45(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getProducts(): Promise<Array<Product>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getProducts();
+                return from_candid_vec_n43(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getProducts();
+            return from_candid_vec_n43(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getProductsBySeller(arg0: string): Promise<Array<Product>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getProductsBySeller(arg0);
+                return from_candid_vec_n43(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getProductsBySeller(arg0);
+            return from_candid_vec_n43(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getSeller(arg0: SellerId): Promise<Seller | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSeller(arg0);
+                return from_candid_opt_n46(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSeller(arg0);
+            return from_candid_opt_n46(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getSellerByEmailOrPhone(arg0: string, arg1: string): Promise<Seller | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSellerByEmailOrPhone(arg0, arg1);
+                return from_candid_opt_n46(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSellerByEmailOrPhone(arg0, arg1);
+            return from_candid_opt_n46(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getSellerEarnings(arg0: string): Promise<SellerEarnings> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSellerEarnings(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSellerEarnings(arg0);
+            return result;
+        }
+    }
+    async listCoupons(): Promise<Array<Coupon>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listCoupons();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listCoupons();
+            return result;
+        }
+    }
+    async listModelPhotos(): Promise<Array<ModelPhoto>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listModelPhotos();
+                return from_candid_vec_n47(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listModelPhotos();
+            return from_candid_vec_n47(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listOrders(): Promise<Array<[OrderId, Order]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listOrders();
+                return from_candid_vec_n48(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listOrders();
+            return from_candid_vec_n48(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listOrdersByCustomer(arg0: string): Promise<Array<Order>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listOrdersByCustomer(arg0);
+                return from_candid_vec_n50(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listOrdersByCustomer(arg0);
+            return from_candid_vec_n50(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listOrdersBySeller(arg0: string): Promise<Array<Order>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listOrdersBySeller(arg0);
+                return from_candid_vec_n50(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listOrdersBySeller(arg0);
+            return from_candid_vec_n50(this._uploadFile, this._downloadFile, result);
         }
     }
     async listSellers(): Promise<Array<Seller>> {
@@ -476,6 +831,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async registerCustomer(arg0: string, arg1: string): Promise<Customer> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.registerCustomer(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.registerCustomer(arg0, arg1);
+            return result;
+        }
+    }
     async registerSeller(arg0: SellerInput): Promise<{
         __kind__: "ok";
         ok: Seller;
@@ -486,14 +855,34 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.registerSeller(arg0);
-                return from_candid_variant_n40(this._uploadFile, this._downloadFile, result);
+                return from_candid_variant_n51(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.registerSeller(arg0);
-            return from_candid_variant_n40(this._uploadFile, this._downloadFile, result);
+            return from_candid_variant_n51(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async rejectOrder(arg0: OrderId, arg1: string): Promise<{
+        __kind__: "ok";
+        ok: Order;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.rejectOrder(arg0, arg1);
+                return from_candid_variant_n3(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.rejectOrder(arg0, arg1);
+            return from_candid_variant_n3(this._uploadFile, this._downloadFile, result);
         }
     }
     async removeSeller(arg0: SellerId): Promise<boolean> {
@@ -510,6 +899,26 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async setProductTrending(arg0: ProductId, arg1: boolean): Promise<{
+        __kind__: "ok";
+        ok: Product;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setProductTrending(arg0, arg1);
+                return from_candid_variant_n35(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setProductTrending(arg0, arg1);
+            return from_candid_variant_n35(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async submitFitAndTryRequest(arg0: FitAndTryRequest): Promise<string> {
         if (this.processError) {
             try {
@@ -524,6 +933,26 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async toggleCoupon(arg0: CouponId): Promise<{
+        __kind__: "ok";
+        ok: Coupon;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.toggleCoupon(arg0);
+                return from_candid_variant_n25(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.toggleCoupon(arg0);
+            return from_candid_variant_n25(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async updateOrderStatus(arg0: OrderId, arg1: OrderStatus): Promise<{
         __kind__: "ok";
         ok: Order;
@@ -533,15 +962,15 @@ export class Backend implements backendInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateOrderStatus(arg0, to_candid_OrderStatus_n41(this._uploadFile, this._downloadFile, arg1));
-                return from_candid_variant_n43(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.updateOrderStatus(arg0, to_candid_OrderStatus_n52(this._uploadFile, this._downloadFile, arg1));
+                return from_candid_variant_n3(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateOrderStatus(arg0, to_candid_OrderStatus_n41(this._uploadFile, this._downloadFile, arg1));
-            return from_candid_variant_n43(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.updateOrderStatus(arg0, to_candid_OrderStatus_n52(this._uploadFile, this._downloadFile, arg1));
+            return from_candid_variant_n3(this._uploadFile, this._downloadFile, result);
         }
     }
     async updateProduct(arg0: ProductId, arg1: ProductInput): Promise<{
@@ -553,91 +982,70 @@ export class Backend implements backendInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateProduct(arg0, to_candid_ProductInput_n20(this._uploadFile, this._downloadFile, arg1));
-                return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.updateProduct(arg0, to_candid_ProductInput_n33(this._uploadFile, this._downloadFile, arg1));
+                return from_candid_variant_n35(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateProduct(arg0, to_candid_ProductInput_n20(this._uploadFile, this._downloadFile, arg1));
-            return from_candid_variant_n24(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.updateProduct(arg0, to_candid_ProductInput_n33(this._uploadFile, this._downloadFile, arg1));
+            return from_candid_variant_n35(this._uploadFile, this._downloadFile, result);
         }
     }
 }
-function from_candid_CartItem_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CartItem): CartItem {
-    return from_candid_record_n19(_uploadFile, _downloadFile, value);
+function from_candid_CartItem_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CartItem): CartItem {
+    return from_candid_record_n16(_uploadFile, _downloadFile, value);
 }
-function from_candid_DeliveryOption_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _DeliveryOption): DeliveryOption {
-    return from_candid_variant_n16(_uploadFile, _downloadFile, value);
+function from_candid_DeliveryOption_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _DeliveryOption): DeliveryOption {
+    return from_candid_variant_n13(_uploadFile, _downloadFile, value);
 }
-function from_candid_FulfillmentBy_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _FulfillmentBy): FulfillmentBy {
-    return from_candid_variant_n28(_uploadFile, _downloadFile, value);
+function from_candid_FulfillmentBy_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _FulfillmentBy): FulfillmentBy {
+    return from_candid_variant_n19(_uploadFile, _downloadFile, value);
 }
-function from_candid_Notification_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Notification): Notification {
-    return from_candid_record_n32(_uploadFile, _downloadFile, value);
+function from_candid_ModelPhoto_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ModelPhoto): ModelPhoto {
+    return from_candid_record_n23(_uploadFile, _downloadFile, value);
 }
-function from_candid_OrderStatus_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrderStatus): OrderStatus {
-    return from_candid_variant_n12(_uploadFile, _downloadFile, value);
+function from_candid_Notification_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Notification): Notification {
+    return from_candid_record_n40(_uploadFile, _downloadFile, value);
 }
-function from_candid_Order_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Order): Order {
-    return from_candid_record_n10(_uploadFile, _downloadFile, value);
+function from_candid_OrderStatus_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrderStatus): OrderStatus {
+    return from_candid_variant_n7(_uploadFile, _downloadFile, value);
 }
-function from_candid_PaymentMethod_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PaymentMethod): PaymentMethod {
-    return from_candid_variant_n14(_uploadFile, _downloadFile, value);
+function from_candid_Order_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Order): Order {
+    return from_candid_record_n5(_uploadFile, _downloadFile, value);
 }
-function from_candid_Product_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Product): Product {
-    return from_candid_record_n26(_uploadFile, _downloadFile, value);
+function from_candid_PaymentMethod_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PaymentMethod): PaymentMethod {
+    return from_candid_variant_n10(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+function from_candid_Product_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Product): Product {
+    return from_candid_record_n37(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [bigint]): bigint | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Order]): Order | null {
-    return value.length === 0 ? null : from_candid_Order_n9(_uploadFile, _downloadFile, value[0]);
+function from_candid_opt_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_FulfillmentBy]): FulfillmentBy | null {
+    return value.length === 0 ? null : from_candid_FulfillmentBy_n18(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_opt_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Product]): Product | null {
-    return value.length === 0 ? null : from_candid_Product_n25(_uploadFile, _downloadFile, value[0]);
-}
-function from_candid_opt_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Seller]): Seller | null {
+function from_candid_opt_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Coupon]): Coupon | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    id: _OrderId;
-    customerName: string;
-    status: _OrderStatus;
-    total: bigint;
-    paymentMethod: _PaymentMethod;
-    customerPhone: string;
-    createdAt: _Timestamp;
-    deliveryOption: _DeliveryOption;
-    shippingAddress: string;
-    items: Array<_CartItem>;
-}): {
-    id: OrderId;
-    customerName: string;
-    status: OrderStatus;
-    total: bigint;
-    paymentMethod: PaymentMethod;
-    customerPhone: string;
-    createdAt: Timestamp;
-    deliveryOption: DeliveryOption;
-    shippingAddress: string;
-    items: Array<CartItem>;
-} {
-    return {
-        id: value.id,
-        customerName: value.customerName,
-        status: from_candid_OrderStatus_n11(_uploadFile, _downloadFile, value.status),
-        total: value.total,
-        paymentMethod: from_candid_PaymentMethod_n13(_uploadFile, _downloadFile, value.paymentMethod),
-        customerPhone: value.customerPhone,
-        createdAt: value.createdAt,
-        deliveryOption: from_candid_DeliveryOption_n15(_uploadFile, _downloadFile, value.deliveryOption),
-        shippingAddress: value.shippingAddress,
-        items: from_candid_vec_n17(_uploadFile, _downloadFile, value.items)
-    };
+function from_candid_opt_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Customer]): Customer | null {
+    return value.length === 0 ? null : value[0];
 }
-function from_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_opt_n44(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Order]): Order | null {
+    return value.length === 0 ? null : from_candid_Order_n4(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_opt_n45(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Product]): Product | null {
+    return value.length === 0 ? null : from_candid_Product_n36(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_opt_n46(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Seller]): Seller | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_record_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     productId: _ProductId;
     deliveryOption: _DeliveryOption;
     quantity: bigint;
@@ -650,15 +1058,34 @@ function from_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         productId: value.productId,
-        deliveryOption: from_candid_DeliveryOption_n15(_uploadFile, _downloadFile, value.deliveryOption),
+        deliveryOption: from_candid_DeliveryOption_n12(_uploadFile, _downloadFile, value.deliveryOption),
         quantity: value.quantity,
         selectedSize: value.selectedSize
     };
 }
-function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: _ModelPhotoId;
+    createdAt: _Timestamp;
+    imageUrl: string;
+    caption: [] | [string];
+}): {
+    id: ModelPhotoId;
+    createdAt: Timestamp;
+    imageUrl: string;
+    caption?: string;
+} {
+    return {
+        id: value.id,
+        createdAt: value.createdAt,
+        imageUrl: value.imageUrl,
+        caption: record_opt_to_undefined(from_candid_opt_n8(_uploadFile, _downloadFile, value.caption))
+    };
+}
+function from_candid_record_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: _ProductId;
     fulfillmentBy: _FulfillmentBy;
     name: string;
+    createdAt: bigint;
     description: string;
     hasFitAndTry: boolean;
     sizes: Array<string>;
@@ -671,10 +1098,12 @@ function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uin
     category: string;
     sellerId: string;
     price: bigint;
+    isTrending: boolean;
 }): {
     id: ProductId;
     fulfillmentBy: FulfillmentBy;
     name: string;
+    createdAt: bigint;
     description: string;
     hasFitAndTry: boolean;
     sizes: Array<string>;
@@ -687,11 +1116,13 @@ function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uin
     category: string;
     sellerId: string;
     price: bigint;
+    isTrending: boolean;
 } {
     return {
         id: value.id,
-        fulfillmentBy: from_candid_FulfillmentBy_n27(_uploadFile, _downloadFile, value.fulfillmentBy),
+        fulfillmentBy: from_candid_FulfillmentBy_n18(_uploadFile, _downloadFile, value.fulfillmentBy),
         name: value.name,
+        createdAt: value.createdAt,
         description: value.description,
         hasFitAndTry: value.hasFitAndTry,
         sizes: value.sizes,
@@ -703,10 +1134,11 @@ function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uin
         gender: value.gender,
         category: value.category,
         sellerId: value.sellerId,
-        price: value.price
+        price: value.price,
+        isTrending: value.isTrending
     };
 }
-function from_candid_record_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: _NotificationId;
     createdAt: bigint;
     isRead: boolean;
@@ -725,40 +1157,73 @@ function from_candid_record_n32(_uploadFile: (file: ExternalBlob) => Promise<Uin
         id: value.id,
         createdAt: value.createdAt,
         isRead: value.isRead,
-        orderId: record_opt_to_undefined(from_candid_opt_n33(_uploadFile, _downloadFile, value.orderId)),
+        orderId: record_opt_to_undefined(from_candid_opt_n8(_uploadFile, _downloadFile, value.orderId)),
         message: value.message,
-        sellerId: record_opt_to_undefined(from_candid_opt_n33(_uploadFile, _downloadFile, value.sellerId))
+        sellerId: record_opt_to_undefined(from_candid_opt_n8(_uploadFile, _downloadFile, value.sellerId))
     };
 }
-function from_candid_tuple_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [_OrderId, _Order]): [OrderId, Order] {
+function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: _OrderId;
+    customerName: string;
+    status: _OrderStatus;
+    couponCode: [] | [string];
+    total: bigint;
+    paymentMethod: _PaymentMethod;
+    customerPhone: string;
+    discountAmount: [] | [bigint];
+    createdAt: _Timestamp;
+    deliveryOption: _DeliveryOption;
+    shippingAddress: string;
+    customerId: _CustomerId;
+    items: Array<_CartItem>;
+    fulfillmentChoice: [] | [_FulfillmentBy];
+}): {
+    id: OrderId;
+    customerName: string;
+    status: OrderStatus;
+    couponCode?: string;
+    total: bigint;
+    paymentMethod: PaymentMethod;
+    customerPhone: string;
+    discountAmount?: bigint;
+    createdAt: Timestamp;
+    deliveryOption: DeliveryOption;
+    shippingAddress: string;
+    customerId: CustomerId;
+    items: Array<CartItem>;
+    fulfillmentChoice?: FulfillmentBy;
+} {
+    return {
+        id: value.id,
+        customerName: value.customerName,
+        status: from_candid_OrderStatus_n6(_uploadFile, _downloadFile, value.status),
+        couponCode: record_opt_to_undefined(from_candid_opt_n8(_uploadFile, _downloadFile, value.couponCode)),
+        total: value.total,
+        paymentMethod: from_candid_PaymentMethod_n9(_uploadFile, _downloadFile, value.paymentMethod),
+        customerPhone: value.customerPhone,
+        discountAmount: record_opt_to_undefined(from_candid_opt_n11(_uploadFile, _downloadFile, value.discountAmount)),
+        createdAt: value.createdAt,
+        deliveryOption: from_candid_DeliveryOption_n12(_uploadFile, _downloadFile, value.deliveryOption),
+        shippingAddress: value.shippingAddress,
+        customerId: value.customerId,
+        items: from_candid_vec_n14(_uploadFile, _downloadFile, value.items),
+        fulfillmentChoice: record_opt_to_undefined(from_candid_opt_n17(_uploadFile, _downloadFile, value.fulfillmentChoice))
+    };
+}
+function from_candid_tuple_n49(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [_OrderId, _Order]): [OrderId, Order] {
     return [
         value[0],
-        from_candid_Order_n9(_uploadFile, _downloadFile, value[1])
+        from_candid_Order_n4(_uploadFile, _downloadFile, value[1])
     ];
 }
-function from_candid_variant_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    Delivered: null;
-} | {
-    Confirmed: null;
-} | {
-    Cancelled: null;
-} | {
-    Processing: null;
-} | {
-    Shipped: null;
-} | {
-    Pending: null;
-}): OrderStatus {
-    return "Delivered" in value ? OrderStatus.Delivered : "Confirmed" in value ? OrderStatus.Confirmed : "Cancelled" in value ? OrderStatus.Cancelled : "Processing" in value ? OrderStatus.Processing : "Shipped" in value ? OrderStatus.Shipped : "Pending" in value ? OrderStatus.Pending : value;
-}
-function from_candid_variant_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     Card: null;
 } | {
     CashOnDelivery: null;
 }): PaymentMethod {
     return "Card" in value ? PaymentMethod.Card : "CashOnDelivery" in value ? PaymentMethod.CashOnDelivery : value;
 }
-function from_candid_variant_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     SameDay: null;
 } | {
     NextDay: null;
@@ -767,33 +1232,33 @@ function from_candid_variant_n16(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): DeliveryOption {
     return "SameDay" in value ? DeliveryOption.SameDay : "NextDay" in value ? DeliveryOption.NextDay : "Standard" in value ? DeliveryOption.Standard : value;
 }
-function from_candid_variant_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    ok: _Product;
-} | {
-    err: string;
-}): {
-    __kind__: "ok";
-    ok: Product;
-} | {
-    __kind__: "err";
-    err: string;
-} {
-    return "ok" in value ? {
-        __kind__: "ok",
-        ok: from_candid_Product_n25(_uploadFile, _downloadFile, value.ok)
-    } : "err" in value ? {
-        __kind__: "err",
-        err: value.err
-    } : value;
-}
-function from_candid_variant_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     AdminFulfilled: null;
 } | {
     SellerFulfilled: null;
 }): FulfillmentBy {
     return "AdminFulfilled" in value ? FulfillmentBy.AdminFulfilled : "SellerFulfilled" in value ? FulfillmentBy.SellerFulfilled : value;
 }
-function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _ModelPhoto;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: ModelPhoto;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_ModelPhoto_n22(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     ok: null;
 } | {
     err: string;
@@ -812,7 +1277,64 @@ function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Ui
         err: value.err
     } : value;
 }
-function from_candid_variant_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _Coupon;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Coupon;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: value.ok
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _Order;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Order;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_Order_n4(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _Product;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Product;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_Product_n36(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n51(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     ok: _Seller;
 } | {
     err: string;
@@ -831,59 +1353,85 @@ function from_candid_variant_n40(_uploadFile: (file: ExternalBlob) => Promise<Ui
         err: value.err
     } : value;
 }
-function from_candid_variant_n43(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    ok: _Order;
+function from_candid_variant_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    Delivered: null;
 } | {
-    err: string;
-}): {
-    __kind__: "ok";
-    ok: Order;
+    Confirmed: null;
 } | {
-    __kind__: "err";
-    err: string;
-} {
-    return "ok" in value ? {
-        __kind__: "ok",
-        ok: from_candid_Order_n9(_uploadFile, _downloadFile, value.ok)
-    } : "err" in value ? {
-        __kind__: "err",
-        err: value.err
-    } : value;
+    Placed: null;
+} | {
+    Rejected: null;
+} | {
+    Accepted: null;
+} | {
+    Cancelled: null;
+} | {
+    Processing: null;
+} | {
+    Shipped: null;
+} | {
+    Pending: null;
+}): OrderStatus {
+    return "Delivered" in value ? OrderStatus.Delivered : "Confirmed" in value ? OrderStatus.Confirmed : "Placed" in value ? OrderStatus.Placed : "Rejected" in value ? OrderStatus.Rejected : "Accepted" in value ? OrderStatus.Accepted : "Cancelled" in value ? OrderStatus.Cancelled : "Processing" in value ? OrderStatus.Processing : "Shipped" in value ? OrderStatus.Shipped : "Pending" in value ? OrderStatus.Pending : value;
 }
-function from_candid_vec_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_CartItem>): Array<CartItem> {
-    return value.map((x)=>from_candid_CartItem_n18(_uploadFile, _downloadFile, x));
+function from_candid_vec_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_CartItem>): Array<CartItem> {
+    return value.map((x)=>from_candid_CartItem_n15(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Notification>): Array<Notification> {
-    return value.map((x)=>from_candid_Notification_n31(_uploadFile, _downloadFile, x));
+function from_candid_vec_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Notification>): Array<Notification> {
+    return value.map((x)=>from_candid_Notification_n39(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Product>): Array<Product> {
-    return value.map((x)=>from_candid_Product_n25(_uploadFile, _downloadFile, x));
+function from_candid_vec_n43(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Product>): Array<Product> {
+    return value.map((x)=>from_candid_Product_n36(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[_OrderId, _Order]>): Array<[OrderId, Order]> {
-    return value.map((x)=>from_candid_tuple_n39(_uploadFile, _downloadFile, x));
+function from_candid_vec_n47(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_ModelPhoto>): Array<ModelPhoto> {
+    return value.map((x)=>from_candid_ModelPhoto_n22(_uploadFile, _downloadFile, x));
 }
-function to_candid_CartItem_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CartItem): _CartItem {
-    return to_candid_record_n4(_uploadFile, _downloadFile, value);
+function from_candid_vec_n48(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[_OrderId, _Order]>): Array<[OrderId, Order]> {
+    return value.map((x)=>from_candid_tuple_n49(_uploadFile, _downloadFile, x));
 }
-function to_candid_DeliveryOption_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: DeliveryOption): _DeliveryOption {
-    return to_candid_variant_n6(_uploadFile, _downloadFile, value);
+function from_candid_vec_n50(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Order>): Array<Order> {
+    return value.map((x)=>from_candid_Order_n4(_uploadFile, _downloadFile, x));
 }
-function to_candid_FulfillmentBy_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: FulfillmentBy): _FulfillmentBy {
-    return to_candid_variant_n23(_uploadFile, _downloadFile, value);
+function to_candid_CartItem_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CartItem): _CartItem {
+    return to_candid_record_n28(_uploadFile, _downloadFile, value);
 }
-function to_candid_OrderStatus_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): _OrderStatus {
-    return to_candid_variant_n42(_uploadFile, _downloadFile, value);
+function to_candid_DeliveryOption_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: DeliveryOption): _DeliveryOption {
+    return to_candid_variant_n30(_uploadFile, _downloadFile, value);
 }
-function to_candid_PaymentMethod_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): _PaymentMethod {
-    return to_candid_variant_n8(_uploadFile, _downloadFile, value);
+function to_candid_FulfillmentBy_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: FulfillmentBy): _FulfillmentBy {
+    return to_candid_variant_n2(_uploadFile, _downloadFile, value);
 }
-function to_candid_ProductInput_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ProductInput): _ProductInput {
-    return to_candid_record_n21(_uploadFile, _downloadFile, value);
+function to_candid_OrderStatus_n52(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): _OrderStatus {
+    return to_candid_variant_n53(_uploadFile, _downloadFile, value);
 }
-function to_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+function to_candid_PaymentMethod_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): _PaymentMethod {
+    return to_candid_variant_n32(_uploadFile, _downloadFile, value);
+}
+function to_candid_ProductInput_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ProductInput): _ProductInput {
+    return to_candid_record_n34(_uploadFile, _downloadFile, value);
+}
+function to_candid_opt_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
     return value === null ? candid_none() : candid_some(value);
 }
-function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    productId: ProductId;
+    deliveryOption: DeliveryOption;
+    quantity: bigint;
+    selectedSize: string;
+}): {
+    productId: _ProductId;
+    deliveryOption: _DeliveryOption;
+    quantity: bigint;
+    selectedSize: string;
+} {
+    return {
+        productId: value.productId,
+        deliveryOption: to_candid_DeliveryOption_n29(_uploadFile, _downloadFile, value.deliveryOption),
+        quantity: value.quantity,
+        selectedSize: value.selectedSize
+    };
+}
+function to_candid_record_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     fulfillmentBy: FulfillmentBy;
     name: string;
     description: string;
@@ -897,6 +1445,7 @@ function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     category: string;
     sellerId: string;
     price: bigint;
+    isTrending: boolean;
 }): {
     fulfillmentBy: _FulfillmentBy;
     name: string;
@@ -911,9 +1460,10 @@ function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     category: string;
     sellerId: string;
     price: bigint;
+    isTrending: boolean;
 } {
     return {
-        fulfillmentBy: to_candid_FulfillmentBy_n22(_uploadFile, _downloadFile, value.fulfillmentBy),
+        fulfillmentBy: to_candid_FulfillmentBy_n1(_uploadFile, _downloadFile, value.fulfillmentBy),
         name: value.name,
         description: value.description,
         hasFitAndTry: value.hasFitAndTry,
@@ -925,28 +1475,11 @@ function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         gender: value.gender,
         category: value.category,
         sellerId: value.sellerId,
-        price: value.price
+        price: value.price,
+        isTrending: value.isTrending
     };
 }
-function to_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    productId: ProductId;
-    deliveryOption: DeliveryOption;
-    quantity: bigint;
-    selectedSize: string;
-}): {
-    productId: _ProductId;
-    deliveryOption: _DeliveryOption;
-    quantity: bigint;
-    selectedSize: string;
-} {
-    return {
-        productId: value.productId,
-        deliveryOption: to_candid_DeliveryOption_n5(_uploadFile, _downloadFile, value.deliveryOption),
-        quantity: value.quantity,
-        selectedSize: value.selectedSize
-    };
-}
-function to_candid_variant_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: FulfillmentBy): {
+function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: FulfillmentBy): {
     AdminFulfilled: null;
 } | {
     SellerFulfilled: null;
@@ -957,34 +1490,7 @@ function to_candid_variant_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint
         SellerFulfilled: null
     } : value;
 }
-function to_candid_variant_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): {
-    Delivered: null;
-} | {
-    Confirmed: null;
-} | {
-    Cancelled: null;
-} | {
-    Processing: null;
-} | {
-    Shipped: null;
-} | {
-    Pending: null;
-} {
-    return value == OrderStatus.Delivered ? {
-        Delivered: null
-    } : value == OrderStatus.Confirmed ? {
-        Confirmed: null
-    } : value == OrderStatus.Cancelled ? {
-        Cancelled: null
-    } : value == OrderStatus.Processing ? {
-        Processing: null
-    } : value == OrderStatus.Shipped ? {
-        Shipped: null
-    } : value == OrderStatus.Pending ? {
-        Pending: null
-    } : value;
-}
-function to_candid_variant_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: DeliveryOption): {
+function to_candid_variant_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: DeliveryOption): {
     SameDay: null;
 } | {
     NextDay: null;
@@ -999,7 +1505,7 @@ function to_candid_variant_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         Standard: null
     } : value;
 }
-function to_candid_variant_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): {
+function to_candid_variant_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): {
     Card: null;
 } | {
     CashOnDelivery: null;
@@ -1010,8 +1516,47 @@ function to_candid_variant_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         CashOnDelivery: null
     } : value;
 }
-function to_candid_vec_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<CartItem>): Array<_CartItem> {
-    return value.map((x)=>to_candid_CartItem_n3(_uploadFile, _downloadFile, x));
+function to_candid_variant_n53(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): {
+    Delivered: null;
+} | {
+    Confirmed: null;
+} | {
+    Placed: null;
+} | {
+    Rejected: null;
+} | {
+    Accepted: null;
+} | {
+    Cancelled: null;
+} | {
+    Processing: null;
+} | {
+    Shipped: null;
+} | {
+    Pending: null;
+} {
+    return value == OrderStatus.Delivered ? {
+        Delivered: null
+    } : value == OrderStatus.Confirmed ? {
+        Confirmed: null
+    } : value == OrderStatus.Placed ? {
+        Placed: null
+    } : value == OrderStatus.Rejected ? {
+        Rejected: null
+    } : value == OrderStatus.Accepted ? {
+        Accepted: null
+    } : value == OrderStatus.Cancelled ? {
+        Cancelled: null
+    } : value == OrderStatus.Processing ? {
+        Processing: null
+    } : value == OrderStatus.Shipped ? {
+        Shipped: null
+    } : value == OrderStatus.Pending ? {
+        Pending: null
+    } : value;
+}
+function to_candid_vec_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<CartItem>): Array<_CartItem> {
+    return value.map((x)=>to_candid_CartItem_n27(_uploadFile, _downloadFile, x));
 }
 export interface CreateActorOptions {
     agent?: Agent;

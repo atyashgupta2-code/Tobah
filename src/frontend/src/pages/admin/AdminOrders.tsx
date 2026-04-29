@@ -10,18 +10,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
+  Bell,
+  CheckCheck,
   ChevronDown,
   ChevronUp,
   Flame,
   ShoppingBag,
   Store,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Order, OrderId } from "../../backend.d";
-import { OrderStatus } from "../../backend.d";
+import { FulfillmentBy, OrderStatus } from "../../backend.d";
 import {
+  useGetAllAdminNotifications,
   useListOrders,
+  useMarkAdminNotificationRead,
   useUpdateOrderStatus,
 } from "../../hooks/useAdminProducts";
 import { useProducts } from "../../hooks/useProducts";
@@ -29,6 +34,10 @@ import { AdminLayout } from "./AdminLayout";
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> =
   {
+    [OrderStatus.Placed]: {
+      label: "Placed",
+      className: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    },
     [OrderStatus.Pending]: {
       label: "Pending",
       className: "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
@@ -53,15 +62,26 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> =
       label: "Cancelled",
       className: "bg-destructive/15 text-destructive border-destructive/30",
     },
+    [OrderStatus.Accepted]: {
+      label: "Accepted",
+      className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+    },
+    [OrderStatus.Rejected]: {
+      label: "Rejected",
+      className: "bg-red-600/15 text-red-400 border-red-600/30",
+    },
   };
 
 const ALL_STATUSES = [
+  OrderStatus.Placed,
   OrderStatus.Pending,
   OrderStatus.Confirmed,
   OrderStatus.Processing,
+  OrderStatus.Accepted,
   OrderStatus.Shipped,
   OrderStatus.Delivered,
   OrderStatus.Cancelled,
+  OrderStatus.Rejected,
 ];
 
 function formatDate(ts: bigint): string {
@@ -113,6 +133,121 @@ function parseAddress(raw: string): ParsedAddress {
   }
 }
 
+// ─── Fulfillment Badge — prominent, easy to spot ──────────────────────────────
+function FulfillmentBadge({ choice }: { choice?: FulfillmentBy }) {
+  if (!choice) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border bg-yellow-500/10 border-yellow-500/30 text-yellow-400">
+        ⏳ <span className="font-black">Awaiting delivery choice</span>
+      </span>
+    );
+  }
+  const isSeller = choice === FulfillmentBy.SellerFulfilled;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-xl border ${
+        isSeller
+          ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+          : "bg-blue-500/15 border-blue-500/40 text-blue-300"
+      }`}
+    >
+      {isSeller ? "🚴" : "🏢"}
+      <span>
+        {isSeller ? "Supplier handles delivery" : "Admin handles delivery"}
+      </span>
+    </span>
+  );
+}
+
+function AdminNotificationPanel({
+  onClose,
+}: {
+  onClose: () => void;
+}) {
+  const { data: notifications = [] } = useGetAllAdminNotifications();
+  const markRead = useMarkAdminNotificationRead();
+
+  const unread = notifications.filter((n) => !n.isRead);
+  const sorted = [
+    ...notifications.filter((n) => !n.isRead),
+    ...notifications.filter((n) => n.isRead),
+  ];
+
+  return (
+    <div
+      data-ocid="admin.notifications.panel"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4 pointer-events-none"
+    >
+      <div className="pointer-events-auto w-full max-w-sm bg-card border border-border rounded-2xl shadow-elevated overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+          <span className="font-semibold text-sm text-foreground flex items-center gap-2">
+            <Bell size={14} className="text-primary" />
+            Supplier Actions
+            {unread.length > 0 && (
+              <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {unread.length}
+              </span>
+            )}
+          </span>
+          <button
+            type="button"
+            data-ocid="admin.notifications.close_button"
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-smooth"
+            aria-label="Close"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
+          {sorted.length === 0 ? (
+            <div
+              data-ocid="admin.notifications.empty_state"
+              className="py-10 text-center text-sm text-muted-foreground"
+            >
+              <Bell size={28} className="mx-auto mb-2 opacity-40" />
+              No supplier actions yet
+            </div>
+          ) : (
+            sorted.map((n, i) => (
+              <div
+                key={n.id}
+                data-ocid={`admin.notifications.item.${i + 1}`}
+                className={`px-4 py-3 flex items-start gap-3 ${n.isRead ? "opacity-60" : "bg-primary/5"}`}
+              >
+                <div
+                  className={`mt-1 shrink-0 w-2 h-2 rounded-full ${n.isRead ? "bg-muted-foreground/40" : "bg-primary"}`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground leading-snug">
+                    {n.message}
+                  </p>
+                  {n.orderId && (
+                    <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded mt-1 inline-block">
+                      #{n.orderId.slice(0, 8).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                {!n.isRead && (
+                  <button
+                    type="button"
+                    data-ocid={`admin.notifications.mark_read_button.${i + 1}`}
+                    onClick={() => markRead.mutate(n.id)}
+                    className="shrink-0 p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-smooth"
+                    aria-label="Mark as read"
+                  >
+                    <CheckCheck size={13} />
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderCard({
   orderId,
   order,
@@ -162,28 +297,36 @@ function OrderCard({
       className="bg-card border border-border rounded-2xl overflow-hidden"
     >
       {/* Summary row */}
-      <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">
-              #{shortId}
-            </span>
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${config.className}`}
-            >
-              {config.label}
-            </span>
-            <Badge variant="outline" className="text-[10px] px-1.5 capitalize">
-              {order.deliveryOption === "SameDay"
-                ? "⚡ Same Day"
-                : order.deliveryOption === "NextDay"
-                  ? "🚀 Next Day"
-                  : "📦 Standard"}
-            </Badge>
-            <Badge variant="secondary" className="text-[10px] px-1.5">
-              {order.paymentMethod === "CashOnDelivery" ? "💵 COD" : "💳 Card"}
-            </Badge>
-          </div>
+      <div className="p-4 flex flex-col gap-3">
+        {/* Top row: ID, status, order meta */}
+        <div className="flex items-start gap-3 flex-wrap">
+          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">
+            #{shortId}
+          </span>
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${config.className}`}
+          >
+            {config.label}
+          </span>
+          <Badge variant="outline" className="text-[10px] px-1.5 capitalize">
+            {order.deliveryOption === "SameDay"
+              ? "⚡ Same Day"
+              : order.deliveryOption === "NextDay"
+                ? "🚀 Next Day"
+                : "📦 Standard"}
+          </Badge>
+          <Badge variant="secondary" className="text-[10px] px-1.5">
+            {order.paymentMethod === "CashOnDelivery" ? "💵 COD" : "💳 Card"}
+          </Badge>
+        </div>
+
+        {/* Fulfillment badge — prominent, full row on mobile */}
+        <div>
+          <FulfillmentBadge choice={order.fulfillmentChoice} />
+        </div>
+
+        {/* Customer info */}
+        <div className="space-y-0.5">
           <p className="font-bold text-base text-foreground">
             {parsed.customerName || order.customerName || "Unknown Customer"}
           </p>
@@ -210,9 +353,9 @@ function OrderCard({
           </p>
         </div>
 
-        {/* Right: Total + controls */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="text-right">
+        {/* Bottom row: total + controls */}
+        <div className="flex items-center gap-3">
+          <div>
             <p className="font-mono font-black text-lg text-foreground">
               ₹{Number(order.total).toLocaleString()}
             </p>
@@ -221,37 +364,39 @@ function OrderCard({
             </p>
           </div>
 
-          <Select
-            value={order.status}
-            onValueChange={handleStatusChange}
-            disabled={updateStatus.isPending}
-          >
-            <SelectTrigger
-              data-ocid={`admin.orders.status_select.${index}`}
-              className="h-8 text-xs w-[120px]"
+          <div className="ml-auto flex items-center gap-2">
+            <Select
+              value={order.status}
+              onValueChange={handleStatusChange}
+              disabled={updateStatus.isPending}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ALL_STATUSES.map((s) => (
-                <SelectItem key={s} value={s} className="text-xs">
-                  {STATUS_CONFIG[s].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger
+                data-ocid={`admin.orders.status_select.${index}`}
+                className="h-8 text-xs w-[120px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ALL_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s} className="text-xs">
+                    {STATUS_CONFIG[s].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <button
-            type="button"
-            onClick={() => setExpanded((e) => !e)}
-            data-ocid={`admin.orders.expand_button.${index}`}
-            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-smooth"
-            aria-label={
-              expanded ? "Collapse order details" : "Expand order details"
-            }
-          >
-            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
+            <button
+              type="button"
+              onClick={() => setExpanded((e) => !e)}
+              data-ocid={`admin.orders.expand_button.${index}`}
+              className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-smooth"
+              aria-label={
+                expanded ? "Collapse order details" : "Expand order details"
+              }
+            >
+              {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -278,7 +423,7 @@ function OrderCard({
                 { label: "Pincode", value: parsed.pincode },
               ].map(({ label, value }) => (
                 <div key={label} className="flex gap-2">
-                  <span className="text-muted-foreground w-20 shrink-0 text-xs font-semibold uppercase tracking-wide">
+                  <span className="text-muted-foreground w-24 shrink-0 text-xs font-semibold uppercase tracking-wide">
                     {label}
                   </span>
                   <span className="text-foreground break-words min-w-0 font-medium">
@@ -286,6 +431,15 @@ function OrderCard({
                   </span>
                 </div>
               ))}
+              {/* Fulfillment row — highlighted */}
+              <div className="flex gap-2 pt-1 border-t border-border/40 mt-1">
+                <span className="text-muted-foreground w-24 shrink-0 text-xs font-semibold uppercase tracking-wide">
+                  Fulfillment
+                </span>
+                <div>
+                  <FulfillmentBadge choice={order.fulfillmentChoice} />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -388,6 +542,8 @@ function OrderCard({
 export default function AdminOrders() {
   const { data: orders, isLoading, isError, refetch } = useListOrders();
   const { data: products = [] } = useProducts();
+  const { data: allNotifications = [] } = useGetAllAdminNotifications();
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
 
   // Build lookup maps: productId → orderCount and productId → name
   const productOrderCounts = useMemo<Record<string, number>>(() => {
@@ -421,6 +577,8 @@ export default function AdminOrders() {
   const deliveredCount =
     orders?.filter(([, o]) => o.status === OrderStatus.Delivered).length ?? 0;
 
+  const unreadNotifCount = allNotifications.filter((n) => !n.isRead).length;
+
   return (
     <AdminLayout>
       <div
@@ -438,15 +596,40 @@ export default function AdminOrders() {
               history
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            data-ocid="admin.orders.refresh_button"
-            onClick={() => refetch()}
-            className="gap-2 text-sm"
-          >
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Admin supplier action notifications */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                data-ocid="admin.orders.supplier_notifications_button"
+                onClick={() => setShowNotifPanel((v) => !v)}
+                className="gap-2 text-sm relative"
+              >
+                <Bell size={15} />
+                Supplier Actions
+                {unreadNotifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-primary text-primary-foreground rounded-full text-[10px] font-bold flex items-center justify-center px-1">
+                    {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                  </span>
+                )}
+              </Button>
+              {showNotifPanel && (
+                <AdminNotificationPanel
+                  onClose={() => setShowNotifPanel(false)}
+                />
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              data-ocid="admin.orders.refresh_button"
+              onClick={() => refetch()}
+              className="gap-2 text-sm"
+            >
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}

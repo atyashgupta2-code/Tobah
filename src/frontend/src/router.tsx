@@ -22,6 +22,11 @@ const SellerDashboard = lazy(() => import("./pages/seller/SellerDashboard"));
 const SellerProductForm = lazy(
   () => import("./pages/seller/SellerProductForm"),
 );
+const CustomerLogin = lazy(() => import("./pages/customer/CustomerLogin"));
+const MyOrders = lazy(() => import("./pages/customer/MyOrders"));
+const ModelsPage = lazy(() => import("./pages/ModelsPage"));
+const AdminModels = lazy(() => import("./pages/admin/AdminModels"));
+const CouponCommissionPage = lazy(() => import("./pages/CouponCommissionPage"));
 
 function PageLoader() {
   return (
@@ -79,7 +84,6 @@ const orderConfirmationRoute = createRoute({
   component: OrderConfirmation,
 });
 
-// Admin routes
 const adminDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
@@ -104,7 +108,12 @@ const adminEditProductRoute = createRoute({
   component: ProductForm,
 });
 
-// Seller routes
+const adminModelsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/models",
+  component: AdminModels,
+});
+
 const sellerRegisterRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/seller/register",
@@ -129,6 +138,30 @@ const sellerEditProductRoute = createRoute({
   component: SellerProductForm,
 });
 
+const customerLoginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/customer/login",
+  component: CustomerLogin,
+});
+
+const myOrdersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/customer/orders",
+  component: MyOrders,
+});
+
+const modelsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/models",
+  component: ModelsPage,
+});
+
+const couponCommissionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/coupon-commission",
+  component: CouponCommissionPage,
+});
+
 const routeTree = rootRoute.addChildren([
   homeRoute,
   shopRoute,
@@ -140,10 +173,15 @@ const routeTree = rootRoute.addChildren([
   adminOrdersRoute,
   adminNewProductRoute,
   adminEditProductRoute,
+  adminModelsRoute,
   sellerRegisterRoute,
   sellerDashboardRoute,
   sellerNewProductRoute,
   sellerEditProductRoute,
+  customerLoginRoute,
+  myOrdersRoute,
+  modelsRoute,
+  couponCommissionRoute,
 ]);
 
 export const router = createRouter({ routeTree });

@@ -16,6 +16,27 @@ export interface CartItem {
   'quantity' : bigint,
   'selectedSize' : string,
 }
+export interface Coupon {
+  'id' : CouponId,
+  'code' : string,
+  'createdAt' : Timestamp,
+  'description' : string,
+  'discountPercent' : bigint,
+  'isActive' : boolean,
+}
+export type CouponId = string;
+export interface CouponInput {
+  'code' : string,
+  'description' : string,
+  'discountPercent' : bigint,
+}
+export interface Customer {
+  'id' : CustomerId,
+  'name' : string,
+  'createdAt' : Timestamp,
+  'phone' : string,
+}
+export type CustomerId = string;
 export type DeliveryOption = { 'SameDay' : null } |
   { 'NextDay' : null } |
   { 'Standard' : null };
@@ -32,6 +53,13 @@ export interface Measurements {
   'chest' : bigint,
   'waist' : bigint,
 }
+export interface ModelPhoto {
+  'id' : ModelPhotoId,
+  'createdAt' : Timestamp,
+  'imageUrl' : string,
+  'caption' : [] | [string],
+}
+export type ModelPhotoId = string;
 export interface Notification {
   'id' : NotificationId,
   'createdAt' : bigint,
@@ -45,17 +73,24 @@ export interface Order {
   'id' : OrderId,
   'customerName' : string,
   'status' : OrderStatus,
+  'couponCode' : [] | [string],
   'total' : bigint,
   'paymentMethod' : PaymentMethod,
   'customerPhone' : string,
+  'discountAmount' : [] | [bigint],
   'createdAt' : Timestamp,
   'deliveryOption' : DeliveryOption,
   'shippingAddress' : string,
+  'customerId' : CustomerId,
   'items' : Array<CartItem>,
+  'fulfillmentChoice' : [] | [FulfillmentBy],
 }
 export type OrderId = string;
 export type OrderStatus = { 'Delivered' : null } |
   { 'Confirmed' : null } |
+  { 'Placed' : null } |
+  { 'Rejected' : null } |
+  { 'Accepted' : null } |
   { 'Cancelled' : null } |
   { 'Processing' : null } |
   { 'Shipped' : null } |
@@ -66,6 +101,7 @@ export interface Product {
   'id' : ProductId,
   'fulfillmentBy' : FulfillmentBy,
   'name' : string,
+  'createdAt' : bigint,
   'description' : string,
   'hasFitAndTry' : boolean,
   'sizes' : Array<string>,
@@ -78,6 +114,13 @@ export interface Product {
   'category' : string,
   'sellerId' : string,
   'price' : bigint,
+  'isTrending' : boolean,
+}
+export interface ProductEarningBreakdown {
+  'productId' : string,
+  'productName' : string,
+  'orderCount' : bigint,
+  'totalRevenue' : bigint,
 }
 export type ProductId = string;
 export interface ProductInput {
@@ -94,6 +137,7 @@ export interface ProductInput {
   'category' : string,
   'sellerId' : string,
   'price' : bigint,
+  'isTrending' : boolean,
 }
 export interface Seller {
   'id' : SellerId,
@@ -102,24 +146,55 @@ export interface Seller {
   'createdAt' : bigint,
   'businessName' : string,
   'email' : string,
+  'address' : string,
   'phone' : string,
+}
+export interface SellerEarnings {
+  'productBreakdown' : Array<ProductEarningBreakdown>,
+  'orderCount' : bigint,
+  'totalEarnings' : bigint,
 }
 export type SellerId = string;
 export interface SellerInput {
   'name' : string,
   'businessName' : string,
   'email' : string,
+  'address' : string,
   'phone' : string,
 }
 export type Timestamp = bigint;
 export interface _SERVICE {
+  'acceptOrder' : ActorMethod<
+    [OrderId, FulfillmentBy, string],
+    { 'ok' : Order } |
+      { 'err' : string }
+  >,
+  'addModelPhoto' : ActorMethod<
+    [string, [] | [string]],
+    { 'ok' : ModelPhoto } |
+      { 'err' : string }
+  >,
   'addNotification' : ActorMethod<
     [string, [] | [string], [] | [string]],
     string
   >,
-  'cancelOrder' : ActorMethod<[OrderId], boolean>,
+  'cancelOrder' : ActorMethod<[OrderId], { 'ok' : null } | { 'err' : string }>,
+  'createCoupon' : ActorMethod<
+    [CouponInput],
+    { 'ok' : Coupon } |
+      { 'err' : string }
+  >,
   'createOrder' : ActorMethod<
-    [Array<CartItem>, string, DeliveryOption, PaymentMethod, string, string],
+    [
+      Array<CartItem>,
+      string,
+      DeliveryOption,
+      PaymentMethod,
+      string,
+      string,
+      CustomerId,
+      [] | [string],
+    ],
     Order
   >,
   'createProduct' : ActorMethod<
@@ -127,11 +202,25 @@ export interface _SERVICE {
     { 'ok' : Product } |
       { 'err' : string }
   >,
+  'deleteCoupon' : ActorMethod<
+    [CouponId],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'deleteModelPhoto' : ActorMethod<
+    [ModelPhotoId],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'deleteProduct' : ActorMethod<
     [ProductId],
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'getAllNotifications' : ActorMethod<[], Array<Notification>>,
+  'getCoupon' : ActorMethod<[string], [] | [Coupon]>,
+  'getCustomer' : ActorMethod<[string], [] | [Customer]>,
+  'getNewArrivals' : ActorMethod<[], Array<Product>>,
   'getNotifications' : ActorMethod<[[] | [string]], Array<Notification>>,
   'getOrder' : ActorMethod<[OrderId], [] | [Order]>,
   'getProduct' : ActorMethod<[ProductId], [] | [Product]>,
@@ -139,16 +228,37 @@ export interface _SERVICE {
   'getProductsBySeller' : ActorMethod<[string], Array<Product>>,
   'getSeller' : ActorMethod<[SellerId], [] | [Seller]>,
   'getSellerByEmailOrPhone' : ActorMethod<[string, string], [] | [Seller]>,
+  'getSellerEarnings' : ActorMethod<[string], SellerEarnings>,
+  'listCoupons' : ActorMethod<[], Array<Coupon>>,
+  'listModelPhotos' : ActorMethod<[], Array<ModelPhoto>>,
   'listOrders' : ActorMethod<[], Array<[OrderId, Order]>>,
+  'listOrdersByCustomer' : ActorMethod<[string], Array<Order>>,
+  'listOrdersBySeller' : ActorMethod<[string], Array<Order>>,
   'listSellers' : ActorMethod<[], Array<Seller>>,
   'markNotificationRead' : ActorMethod<[string], boolean>,
+  'registerCustomer' : ActorMethod<[string, string], Customer>,
   'registerSeller' : ActorMethod<
     [SellerInput],
     { 'ok' : Seller } |
       { 'err' : string }
   >,
+  'rejectOrder' : ActorMethod<
+    [OrderId, string],
+    { 'ok' : Order } |
+      { 'err' : string }
+  >,
   'removeSeller' : ActorMethod<[SellerId], boolean>,
+  'setProductTrending' : ActorMethod<
+    [ProductId, boolean],
+    { 'ok' : Product } |
+      { 'err' : string }
+  >,
   'submitFitAndTryRequest' : ActorMethod<[FitAndTryRequest], string>,
+  'toggleCoupon' : ActorMethod<
+    [CouponId],
+    { 'ok' : Coupon } |
+      { 'err' : string }
+  >,
   'updateOrderStatus' : ActorMethod<
     [OrderId, OrderStatus],
     { 'ok' : Order } |

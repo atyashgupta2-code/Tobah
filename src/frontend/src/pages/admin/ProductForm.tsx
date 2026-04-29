@@ -101,7 +101,7 @@ export default function ProductForm() {
       setForm({
         name: existingProduct.name,
         description: existingProduct.description,
-        price: String(Number(existingProduct.price)),
+        price: String(Number(existingProduct.price) / 100),
         imageUrl: existingProduct.imageUrl,
         category: existingProduct.category,
         sizes: existingProduct.sizes.join(", "),
@@ -190,7 +190,7 @@ export default function ProductForm() {
     const input: ProductInput = {
       name: form.name.trim(),
       description: form.description.trim(),
-      price: BigInt(Math.round(Number.parseFloat(form.price))),
+      price: BigInt(Math.round(Number.parseFloat(form.price) * 100)),
       imageUrl: form.imageUrl.trim(),
       category: form.category.trim(),
       sizes: form.sizes
@@ -204,6 +204,7 @@ export default function ProductForm() {
       sellerId: form.sellerId.trim() || "admin",
       sellerName: form.sellerName.trim() || "Admin",
       fulfillmentBy: FulfillmentBy.AdminFulfilled,
+      isTrending: false,
     };
 
     try {

@@ -11,7 +11,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useCustomer } from "../contexts/CustomerContext";
 import {
   isOrderCancelled,
   useCancelOrder,
@@ -61,11 +62,12 @@ function StatusBadge({
       </span>
     );
   }
-  if (status === OrderStatus.Confirmed) {
+  // Handle new #Placed status (shown as confirmed/green)
+  if ((status as string) === "Placed" || status === OrderStatus.Confirmed) {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-        Confirmed
+        {(status as string) === "Placed" ? "Placed ✓" : "Confirmed"}
       </span>
     );
   }
@@ -93,11 +95,11 @@ function StatusBadge({
       </span>
     );
   }
-  // Pending
+  // Pending / any other status
   return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide bg-yellow-500/15 border border-yellow-500/30 text-yellow-400">
       <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-      Pending
+      {String(status)}
     </span>
   );
 }
@@ -125,17 +127,19 @@ function OrderItemRow({
       className="flex items-center gap-3 py-3 border-b border-border last:border-0"
     >
       {/* Thumbnail */}
-      {product?.imageUrl && (
+      {product?.imageUrl ? (
         <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0 border border-border">
           <img
             src={product.imageUrl}
             alt={name}
             className="w-full h-full object-cover"
             loading="lazy"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
           />
         </div>
-      )}
-      {!product?.imageUrl && (
+      ) : (
         <div className="w-12 h-12 rounded-xl bg-muted shrink-0 border border-border flex items-center justify-center">
           <Package size={18} className="text-muted-foreground" />
         </div>
@@ -271,6 +275,12 @@ export default function OrderConfirmation() {
   const { data: order, isLoading, isError } = useOrder(id ?? "");
   const cancelMutation = useCancelOrder();
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const { isLoggedIn } = useCustomer();
+
+  // Scroll to top when page mounts — ensures "Order Placed!" heading is visible
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const localCancelled = id ? isOrderCancelled(id) : false;
   const cancelled = localCancelled || order?.status === OrderStatus.Cancelled;
@@ -313,8 +323,10 @@ export default function OrderConfirmation() {
   const isCOD = order.paymentMethod === PaymentMethod.CashOnDelivery;
   const createdDate = new Date(Number(order.createdAt) / 1_000_000);
   const canCancel =
-    (order.status === OrderStatus.Pending ||
-      order.status === OrderStatus.Processing) &&
+    order.status !== OrderStatus.Shipped &&
+    order.status !== OrderStatus.Delivered &&
+    order.status !== OrderStatus.Cancelled &&
+    order.status !== OrderStatus.Rejected &&
     !cancelled;
 
   function handleCancelConfirm() {
@@ -542,8 +554,8 @@ export default function OrderConfirmation() {
                   Need to cancel?
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  You can cancel while your order is still pending. Once
-                  confirmed, it can't be cancelled.
+                  You can cancel your order at any time before it's shipped or
+                  delivered.
                 </p>
               </div>
             </div>
@@ -592,6 +604,22 @@ export default function OrderConfirmation() {
 
         {/* CTAs */}
         <div className="flex flex-col gap-3">
+          {/* View All Orders — shown when logged in */}
+          <Link
+            to={isLoggedIn ? "/customer/orders" : "/customer/login"}
+            data-ocid="order_confirmation.my_orders_link"
+            className="block"
+          >
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full font-black text-sm py-5 rounded-xl uppercase tracking-widest border-primary/40 text-primary hover:bg-primary/10 transition-smooth"
+            >
+              <Package size={16} className="mr-2" />
+              {isLoggedIn ? "VIEW ALL MY ORDERS →" : "TRACK YOUR ORDERS →"}
+            </Button>
+          </Link>
+
           <Link
             to="/shop"
             data-ocid="order_confirmation.continue_shopping_button"

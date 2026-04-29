@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createActor } from "../backend";
 import type {
   CartItem,
+  Coupon,
   FitAndTryRequest,
   Notification,
   Order,
@@ -19,7 +20,8 @@ export function useProducts() {
       return actor.getProducts();
     },
     enabled: !!actor && !isFetching,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 30, // 30 min — keep images cached longer
+    gcTime: 1000 * 60 * 60, // 60 min GC
   });
 }
 
@@ -32,7 +34,8 @@ export function useProduct(id: string) {
       return actor.getProduct(id);
     },
     enabled: !!actor && !isFetching && !!id,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
   });
 }
 
@@ -62,6 +65,8 @@ export function useCreateOrder() {
       paymentMethod: PaymentMethod;
       customerName: string;
       customerPhone: string;
+      customerId: string;
+      couponCode?: string | null;
     }
   >({
     mutationFn: async ({
@@ -71,6 +76,8 @@ export function useCreateOrder() {
       paymentMethod,
       customerName,
       customerPhone,
+      customerId,
+      couponCode,
     }) => {
       if (!actor) throw new Error("Actor not ready");
       return actor.createOrder(
@@ -80,6 +87,8 @@ export function useCreateOrder() {
         paymentMethod,
         customerName,
         customerPhone,
+        customerId,
+        couponCode ?? null,
       );
     },
     onSuccess: () => {
@@ -99,24 +108,27 @@ export function useSubmitFitAndTry() {
   });
 }
 
-/** Cancel order — calls backend and also marks in localStorage for instant UI update */
+/** Cancel order — calls backend (Result<(), Text>) and also marks in localStorage */
 export function useCancelOrder() {
   const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
-  return useMutation<boolean, Error, string>({
+  return useMutation<void, Error, string>({
     mutationFn: async (orderId) => {
-      // Mark in localStorage immediately for fast UI feedback
       const key = "tbah_cancelled_orders";
       const existing: string[] = JSON.parse(localStorage.getItem(key) ?? "[]");
       if (!existing.includes(orderId)) {
         localStorage.setItem(key, JSON.stringify([...existing, orderId]));
       }
-      if (!actor) return true; // optimistic local-only fallback
-      return actor.cancelOrder(orderId);
+      if (!actor) return;
+      const result = await actor.cancelOrder(orderId);
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
     },
     onSuccess: (_data, orderId) => {
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["customer_orders"] });
     },
   });
 }
@@ -132,6 +144,17 @@ export function isOrderCancelled(orderId: string): boolean {
   }
 }
 
+/** Fetch a coupon by code — returns Coupon or null */
+export function useGetCoupon() {
+  const { actor } = useActor(createActor);
+  return useMutation<Coupon | null, Error, string>({
+    mutationFn: async (code: string) => {
+      if (!actor) throw new Error("Actor not ready");
+      return actor.getCoupon(code);
+    },
+  });
+}
+
 /** Poll customer-facing notifications (no seller filter). Polls every 10s. */
 export function useGetOrderNotifications() {
   const { actor, isFetching } = useActor(createActor);
@@ -143,6 +166,41 @@ export function useGetOrderNotifications() {
     },
     enabled: !!actor && !isFetching,
     refetchInterval: 10_000,
+  });
+}
+
+/**
+ * List all orders for a specific customer by phone number.
+ */
+export function useListOrdersByCustomer(phone: string) {
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery<Order[]>({
+    queryKey: ["customer_orders", phone],
+    queryFn: async () => {
+      if (!actor || !phone) return [];
+      const allOrders = await actor.listOrders();
+      return allOrders
+        .map(([, order]) => order)
+        .filter((o) => o.customerPhone === phone);
+    },
+    enabled: !!actor && !isFetching && !!phone,
+    staleTime: 1000 * 30,
+    refetchInterval: 30_000,
+  });
+}
+
+/** List all model photos for the public models gallery */
+export function useListModelPhotos() {
+  const { actor, isFetching } = useActor(createActor);
+  return useQuery({
+    queryKey: ["model-photos"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listModelPhotos();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
   });
 }
 

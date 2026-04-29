@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Crown, Heart, ShoppingBag, Zap } from "lucide-react";
+import { Crown, ShoppingBag, Zap } from "lucide-react";
 import { useState } from "react";
 import type { Product } from "../backend.d";
 import { DeliveryOption } from "../backend.d";
@@ -53,7 +53,6 @@ export function FeaturedProductCard({
           "0 0 24px 4px oklch(0.75 0.22 65 / 0.15), inset 0 1px 0 oklch(0.75 0.22 65 / 0.2)",
       }}
     >
-      {/* Glow accent */}
       <div
         className="absolute -top-10 -right-10 w-48 h-48 rounded-full pointer-events-none"
         style={{
@@ -63,7 +62,6 @@ export function FeaturedProductCard({
       />
 
       <div className="flex gap-4 p-4">
-        {/* Image */}
         <div className="relative w-40 shrink-0 aspect-[3/4] rounded-xl overflow-hidden bg-muted">
           <img
             src={
@@ -71,9 +69,9 @@ export function FeaturedProductCard({
             }
             alt={product.name}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-smooth"
+            decoding="async"
+            className="w-full h-full object-cover transition-opacity duration-200 group-hover:opacity-90"
           />
-          {/* Best seller badge */}
           <div
             className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wide"
             style={{
@@ -87,10 +85,8 @@ export function FeaturedProductCard({
           </div>
         </div>
 
-        {/* Info */}
         <div className="flex flex-col justify-between flex-1 min-w-0 py-1">
           <div>
-            {/* Order count fire badge */}
             <p
               className="text-xs font-black mb-2 tabular-nums"
               style={{ color: "oklch(0.75 0.22 65)" }}
@@ -163,7 +159,6 @@ export function ProductCard({
   index = 0,
   layout = "grid",
 }: ProductCardProps) {
-  const [wishlist, setWishlist] = useState(false);
   const [added, setAdded] = useState(false);
   const { addItem } = useCart();
   const navigate = useNavigate();
@@ -192,12 +187,6 @@ export function ProductCard({
     navigate({ to: "/checkout" });
   }
 
-  function handleWishlist(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setWishlist((w) => !w);
-  }
-
   if (layout === "list") {
     return (
       <Link
@@ -213,24 +202,9 @@ export function ProductCard({
             }
             alt={product.name}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-smooth"
+            decoding="async"
+            className="w-full h-full object-cover transition-opacity duration-200 group-hover:opacity-90"
           />
-          <button
-            type="button"
-            onClick={handleWishlist}
-            data-ocid={`product.wishlist.${index + 1}`}
-            className="absolute top-2 right-2 p-1 rounded-full bg-background/60 backdrop-blur-sm"
-            aria-label="Add to wishlist"
-          >
-            <Heart
-              size={14}
-              className={cn(
-                wishlist
-                  ? "fill-primary text-primary"
-                  : "text-muted-foreground",
-              )}
-            />
-          </button>
         </div>
         <div className="flex flex-col justify-between py-2 pr-2 flex-1 min-w-0">
           <div>
@@ -257,7 +231,7 @@ export function ProductCard({
               onClick={handleAddToCart}
               data-ocid={`product.add_button.${index + 1}`}
               className={cn(
-                "btn-primary text-xs py-2 px-3 flex-1 min-h-[44px] flex items-center justify-center",
+                "btn-white text-xs py-2 px-3 flex-1 min-h-[44px] flex items-center justify-center",
                 added && "bg-accent text-accent-foreground",
               )}
             >
@@ -267,7 +241,7 @@ export function ProductCard({
               type="button"
               onClick={handleBuyNow}
               data-ocid={`product.buy_now_button.${index + 1}`}
-              className="btn-accent text-xs py-2 px-3 flex items-center gap-1 font-bold min-h-[44px]"
+              className="btn-pink text-xs py-2 px-3 flex items-center gap-1 font-bold min-h-[44px]"
             >
               <Zap size={11} />
               BUY
@@ -285,41 +259,22 @@ export function ProductCard({
       data-ocid={`product.item.${index + 1}`}
       className="relative bg-card rounded-2xl border border-border overflow-hidden transition-smooth hover:shadow-elevated hover:border-primary/30 hover:-translate-y-0.5 group flex flex-col"
     >
-      {/* Image with lazy load */}
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
         <img
           src={product.imageUrl || "/assets/generated/placeholder-product.jpg"}
           alt={product.name}
           loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition-smooth"
+          decoding="async"
+          className="w-full h-full object-cover transition-opacity duration-200 group-hover:opacity-90"
         />
-        {/* Wishlist */}
-        <button
-          type="button"
-          onClick={handleWishlist}
-          data-ocid={`product.wishlist.${index + 1}`}
-          className="absolute top-2.5 right-2.5 p-2 rounded-full bg-background/70 backdrop-blur-sm border border-border/50 transition-smooth hover:scale-110"
-          aria-label="Add to wishlist"
-        >
-          <Heart
-            size={15}
-            className={cn(
-              "transition-colors",
-              wishlist ? "fill-primary text-primary" : "text-muted-foreground",
-            )}
-          />
-        </button>
-        {/* USP Badges */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
           {product.hasSameDayDelivery && (
             <USPBadge type="sameday" size="sm" animated />
           )}
         </div>
-        {/* Hover overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-smooth" />
       </div>
 
-      {/* Info */}
       <div className="p-3 flex flex-col gap-2 flex-1">
         <div>
           <p className="font-display font-bold text-sm text-foreground line-clamp-2 leading-tight">
@@ -335,7 +290,6 @@ export function ProductCard({
           </p>
         </div>
 
-        {/* Sizes preview */}
         {product.sizes.length > 0 && (
           <div className="flex gap-1 flex-wrap">
             {product.sizes.slice(0, 4).map((s) => (
@@ -354,13 +308,12 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex flex-col gap-2 mt-auto">
           <button
             type="button"
             onClick={handleBuyNow}
             data-ocid={`product.buy_now_button.${index + 1}`}
-            className="btn-accent w-full text-xs py-2.5 flex items-center justify-center gap-1.5 font-black uppercase tracking-wide min-h-[44px]"
+            className="btn-pink w-full text-xs py-2.5 flex items-center justify-center gap-1.5 font-black uppercase tracking-wide min-h-[44px]"
           >
             <Zap size={12} />
             Buy Now
@@ -370,8 +323,8 @@ export function ProductCard({
             onClick={handleAddToCart}
             data-ocid={`product.add_button.${index + 1}`}
             className={cn(
-              "btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-1.5 min-h-[44px]",
-              added && "bg-accent text-accent-foreground",
+              "btn-white w-full text-xs py-2.5 flex items-center justify-center gap-1.5 min-h-[44px]",
+              added && "bg-accent text-accent-foreground border-accent",
             )}
           >
             <ShoppingBag size={11} />

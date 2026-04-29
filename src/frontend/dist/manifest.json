@@ -1,0 +1,16 @@
+{
+  "name": "TBah",
+  "short_name": "TBah",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a0a2e",
+  "theme_color": "#9333ea",
+  "description": "Bold fashion for Gen Z. Try At Home, delivered fast.",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

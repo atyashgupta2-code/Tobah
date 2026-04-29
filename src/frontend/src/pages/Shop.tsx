@@ -1,28 +1,111 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Shirt } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Shirt } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import type { Product } from "../backend.d";
 import { FeaturedProductCard, ProductCard } from "../components/ProductCard";
 import { useProducts } from "../hooks/useProducts";
 
-type PriceKey = "all" | "500" | "1000" | "1500" | "2000" | "2000plus";
-type GenderKey = "all" | "Men" | "Women" | "Unisex";
+const SESSION_CATEGORY_KEY = "tbah_last_category";
 
-const PRICE_OPTIONS: { label: string; key: PriceKey; emoji: string }[] = [
-  { label: "All", key: "all", emoji: "✨" },
-  { label: "Under ₹500", key: "500", emoji: "🔥" },
-  { label: "₹500–1000", key: "1000", emoji: "💥" },
-  { label: "₹1000–1500", key: "1500", emoji: "⚡" },
-  { label: "₹1500–2000", key: "2000", emoji: "🌟" },
-  { label: "₹2000+", key: "2000plus", emoji: "👑" },
+type PriceKey = "all" | "500" | "1000" | "1500" | "2000" | "2000plus";
+type CategoryKey = "all" | "Men" | "Women" | "Handicrafts" | "Other";
+
+const PRICE_OPTIONS: {
+  label: string;
+  key: PriceKey;
+  emoji: string;
+  color: string;
+}[] = [
+  { label: "All", key: "all", emoji: "✨", color: "oklch(0.62 0.28 315)" },
+  {
+    label: "Under ₹500",
+    key: "500",
+    emoji: "🔥",
+    color: "oklch(0.68 0.22 35)",
+  },
+  {
+    label: "₹500–1000",
+    key: "1000",
+    emoji: "💥",
+    color: "oklch(0.65 0.24 55)",
+  },
+  {
+    label: "₹1000–1500",
+    key: "1500",
+    emoji: "⚡",
+    color: "oklch(0.72 0.20 80)",
+  },
+  {
+    label: "₹1500–2000",
+    key: "2000",
+    emoji: "🌟",
+    color: "oklch(0.65 0.18 150)",
+  },
+  {
+    label: "₹2000+",
+    key: "2000plus",
+    emoji: "👑",
+    color: "oklch(0.62 0.28 315)",
+  },
 ];
 
-const GENDER_OPTIONS: { label: string; key: GenderKey; emoji: string }[] = [
-  { label: "All", key: "all", emoji: "🛍️" },
-  { label: "Men", key: "Men", emoji: "🧔" },
-  { label: "Women", key: "Women", emoji: "👩" },
-  { label: "Unisex", key: "Unisex", emoji: "🤝" },
+interface CategoryCardDef {
+  key: CategoryKey;
+  label: string;
+  emoji: string;
+  colorClass: string;
+  accentColor: string;
+  genderValues: string[];
+  bgImage: string;
+}
+
+const CATEGORY_CARDS: CategoryCardDef[] = [
+  {
+    key: "Men",
+    label: "Men",
+    emoji: "👟",
+    colorClass: "category-card-men",
+    accentColor: "oklch(0.68 0.12 265)",
+    genderValues: ["Men", "Unisex"],
+    bgImage:
+      "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=800&q=80",
+  },
+  {
+    key: "Women",
+    label: "Women",
+    emoji: "💍",
+    colorClass: "category-card-women",
+    accentColor: "oklch(0.72 0.14 330)",
+    genderValues: ["Women", "Unisex"],
+    // Swapped: Women now gets Men's old image
+    bgImage:
+      "/assets/img_20260424_230920-019dc0a8-534a-758d-97ea-b85bf7b03f3d.jpg",
+  },
+  {
+    key: "Handicrafts",
+    label: "Handicrafts",
+    emoji: "🏺",
+    colorClass: "category-card-handicrafts",
+    accentColor: "oklch(0.75 0.14 75)",
+    genderValues: ["Handicrafts"],
+    // Swapped: Handicrafts now gets Deliver Today's old image
+    bgImage:
+      "/assets/img_20260424_230751-019dc0a7-8e0c-7057-8b25-d11bf115a132.jpg",
+  },
+  {
+    key: "Other",
+    label: "Other",
+    emoji: "🕶️",
+    colorClass: "category-card-other",
+    accentColor: "oklch(0.65 0.11 295)",
+    genderValues: ["Other"],
+    // Swapped: Other now gets Pay When It Arrives' old image (jewelry)
+    bgImage:
+      "/assets/img_20260424_230559-019dc0a8-1cbd-719a-a372-78ada809d196.jpg",
+  },
 ];
 
 /** Exclusive price band logic */
@@ -37,80 +120,146 @@ function matchesPrice(product: Product, priceKey: PriceKey): boolean {
   return true;
 }
 
-/** Case-insensitive gender match */
-function matchesGender(product: Product, genderKey: GenderKey): boolean {
-  if (genderKey === "all") return true;
-  return product.gender.toLowerCase() === genderKey.toLowerCase();
+/** Category match — matches product.gender field */
+function matchesCategory(product: Product, genderValues: string[]): boolean {
+  return genderValues.some(
+    (v) => product.gender.toLowerCase() === v.toLowerCase(),
+  );
 }
 
-// ─── Filter Chip ───────────────────────────────────────────────────────────────
-interface FilterChipProps {
+// ─── Beautiful Price Chip ──────────────────────────────────────────────────────
+interface PriceChipProps {
   label: string;
   emoji: string;
   active: boolean;
+  color: string;
   onClick: () => void;
   ocid: string;
 }
 
-function FilterChip({ label, emoji, active, onClick, ocid }: FilterChipProps) {
+function PriceChip({
+  label,
+  emoji,
+  active,
+  color,
+  onClick,
+  ocid,
+}: PriceChipProps) {
   return (
     <button
       type="button"
       data-ocid={ocid}
       onClick={onClick}
       className={cn(
-        "shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-black border transition-all duration-200 whitespace-nowrap select-none",
+        "shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-black border transition-colors duration-150 whitespace-nowrap select-none relative overflow-hidden",
         active
-          ? "text-primary-foreground border-transparent shadow-[0_0_12px_2px_oklch(0.62_0.28_315/0.45)]"
-          : "bg-card/60 text-muted-foreground border-border/50 hover:border-primary/50 hover:text-foreground hover:bg-card",
+          ? "border-transparent text-[oklch(0.98_0.005_280)] shadow-lg"
+          : "bg-card/50 text-muted-foreground border-border/40 hover:border-border hover:text-foreground hover:bg-card",
       )}
       style={
         active
           ? {
-              background:
-                "linear-gradient(135deg, oklch(0.62 0.28 315), oklch(0.55 0.28 290))",
+              background: `linear-gradient(135deg, ${color}, ${color.replace(")", " / 0.75)")})`,
+              boxShadow: `0 0 18px 3px ${color.replace("oklch(", "oklch(").replace(")", " / 0.4)")}`,
             }
           : undefined
       }
     >
-      <span className="text-sm leading-none">{emoji}</span>
-      {label}
+      {active && (
+        <span
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse at 30% 30%, oklch(1 0 0 / 0.4), transparent 60%)",
+          }}
+        />
+      )}
+      <span className="text-sm leading-none relative z-10">{emoji}</span>
+      <span className="relative z-10">{label}</span>
     </button>
   );
 }
 
-// ─── Gender Pill ───────────────────────────────────────────────────────────────
-interface GenderPillProps {
-  label: string;
-  emoji: string;
-  active: boolean;
-  onClick: () => void;
-  ocid: string;
+// ─── Category Card ─────────────────────────────────────────────────────────────
+interface ShopCategoryCardProps {
+  cat: CategoryCardDef;
+  isActive: boolean;
+  onToggle: () => void;
 }
 
-function GenderPill({ label, emoji, active, onClick, ocid }: GenderPillProps) {
+function ShopCategoryCard({ cat, isActive, onToggle }: ShopCategoryCardProps) {
   return (
     <button
       type="button"
-      data-ocid={ocid}
-      onClick={onClick}
+      data-ocid={`shop.category_card.${cat.key.toLowerCase()}`}
+      onClick={onToggle}
       className={cn(
-        "shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-black border-2 transition-all duration-200 whitespace-nowrap select-none",
-        active
-          ? "border-transparent text-background shadow-[0_0_14px_3px_oklch(0.75_0.22_65/0.5)]"
-          : "bg-transparent text-muted-foreground border-border/40 hover:border-accent/60 hover:text-foreground",
+        "relative rounded-2xl overflow-hidden min-h-[130px] transition-all duration-150 select-none active:scale-95",
+        isActive ? "scale-[1.02]" : "opacity-90 hover:opacity-100",
       )}
       style={
-        active
+        isActive
           ? {
-              background:
-                "linear-gradient(135deg, oklch(0.75 0.22 65), oklch(0.65 0.24 55))",
+              outline: `3px solid ${cat.accentColor}`,
+              outlineOffset: "2px",
+              boxShadow: `0 0 22px 5px ${cat.accentColor}55`,
             }
           : undefined
       }
+      aria-pressed={isActive}
     >
-      <span className="text-sm leading-none">{emoji}</span>
-      {label}
+      {/* Background photo — brighter */}
+      <img
+        src={cat.bgImage}
+        alt={cat.label}
+        className="absolute inset-0 w-full h-full object-cover object-center"
+        loading="lazy"
+        width={400}
+        height={200}
+        style={{ filter: "brightness(1.1) saturate(1.0)" }}
+      />
+      {/* Lighter overlay so photo shows clearly */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: isActive
+            ? "linear-gradient(135deg, rgba(0,0,0,0.55), rgba(0,0,0,0.35))"
+            : "linear-gradient(135deg, rgba(0,0,0,0.40), rgba(0,0,0,0.22))",
+        }}
+      />
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center justify-center gap-2 py-5 px-3 h-full min-h-[130px]">
+        <span className="text-4xl leading-none drop-shadow-sm">
+          {cat.emoji}
+        </span>
+        {/* Stylish label */}
+        <span
+          className="font-display leading-none text-center"
+          style={{
+            fontWeight: 900,
+            fontSize: "1.05rem",
+            letterSpacing: "0.04em",
+            fontStyle: "italic",
+            textShadow: "0 2px 10px rgba(0,0,0,0.7)",
+            background: "linear-gradient(135deg, #ffffff 0%, #e0d5ff 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          {cat.label}
+        </span>
+      </div>
+      {/* Open/close indicator */}
+      <span
+        className="absolute bottom-2 right-2 w-5 h-5 rounded-full flex items-center justify-center z-10"
+        style={{ background: "rgba(255,255,255,0.85)" }}
+      >
+        {isActive ? (
+          <ChevronUp size={11} color="#111" strokeWidth={2.5} />
+        ) : (
+          <ChevronDown size={11} color="#111" strokeWidth={2} />
+        )}
+      </span>
     </button>
   );
 }
@@ -126,9 +275,7 @@ function buildGridItems(
 ): GridItem[] {
   const items: GridItem[] = [];
   let featuredCount = 0;
-
   for (let i = 0; i < filtered.length; i++) {
-    // Inject featured card after every 6th product slot (before index 6, 13, 20…)
     if (bestSeller && i > 0 && i % 6 === 0) {
       items.push({
         type: "featured",
@@ -139,80 +286,34 @@ function buildGridItems(
     }
     items.push({ type: "product", product: filtered[i], gridIndex: i });
   }
-
   return items;
 }
 
-// ─── Shop Page ─────────────────────────────────────────────────────────────────
-export default function Shop() {
-  const { data: products = [], isLoading } = useProducts();
+// ─── Inline accordion product panel ────────────────────────────────────────────
+interface InlineProductsProps {
+  products: Product[];
+  isLoading: boolean;
+  cat: CategoryCardDef;
+  priceFilter: PriceKey;
+  setPriceFilter: (k: PriceKey) => void;
+  expandedRef: RefObject<HTMLDivElement | null>;
+}
 
-  const [priceFilter, setPriceFilter] = useState<PriceKey>("all");
-  const [genderFilter, setGenderFilter] = useState<GenderKey>("all");
-
-  // Hide-on-scroll state
-  const [filterBarVisible, setFilterBarVisible] = useState(true);
-  const lastScrollY = useRef(0);
-  const filterBarRef = useRef<HTMLDivElement>(null);
-
-  // Sync from URL params on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const p = params.get("price");
-    const g = params.get("gender");
-    if (p && ["500", "1000", "1500", "2000", "2000plus"].includes(p)) {
-      setPriceFilter(p as PriceKey);
-    }
-    if (g && ["Men", "Women", "Unisex"].includes(g)) {
-      setGenderFilter(g as GenderKey);
-    }
-  }, []);
-
-  // Update URL when filters change
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (priceFilter !== "all") params.set("price", priceFilter);
-    if (genderFilter !== "all") params.set("gender", genderFilter);
-    const search = params.toString();
-    const newUrl = search
-      ? `${window.location.pathname}?${search}`
-      : window.location.pathname;
-    window.history.replaceState(null, "", newUrl);
-  }, [priceFilter, genderFilter]);
-
-  // Hide filter bar when scrolling down, show when scrolling up or near top
-  useEffect(() => {
-    const SCROLL_THRESHOLD = 60;
-
-    function onScroll() {
-      const currentY = window.scrollY;
-      const diff = currentY - lastScrollY.current;
-
-      if (currentY < SCROLL_THRESHOLD) {
-        // Near top of page — always show
-        setFilterBarVisible(true);
-      } else if (diff > 4) {
-        // Scrolling down — hide
-        setFilterBarVisible(false);
-      } else if (diff < -4) {
-        // Scrolling up — show
-        setFilterBarVisible(true);
-      }
-
-      lastScrollY.current = currentY;
-    }
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
+function InlineProducts({
+  products,
+  isLoading,
+  cat,
+  priceFilter,
+  setPriceFilter,
+  expandedRef,
+}: InlineProductsProps) {
   const filtered = useMemo(() => {
     return products.filter(
-      (p) => matchesPrice(p, priceFilter) && matchesGender(p, genderFilter),
+      (p) =>
+        matchesCategory(p, cat.genderValues) && matchesPrice(p, priceFilter),
     );
-  }, [products, priceFilter, genderFilter]);
+  }, [products, cat.genderValues, priceFilter]);
 
-  // Best seller = product with highest orderCount across ALL loaded products
   const bestSeller = useMemo<Product | null>(() => {
     if (products.length === 0) return null;
     return products.reduce((best, p) =>
@@ -225,176 +326,319 @@ export default function Shop() {
     [filtered, bestSeller],
   );
 
-  const hasActiveFilters = priceFilter !== "all" || genderFilter !== "all";
+  return (
+    <motion.div
+      ref={expandedRef}
+      data-ocid={`shop.category_products.${cat.key.toLowerCase()}`}
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      className="overflow-hidden col-span-2"
+    >
+      <div
+        className="mt-2 rounded-2xl overflow-hidden border border-border/40"
+        style={{
+          background:
+            "linear-gradient(180deg, oklch(0.17 0.02 280) 0%, oklch(0.14 0.01 280) 100%)",
+        }}
+      >
+        {/* Box header */}
+        <div className="px-4 pt-4 pb-3 border-b border-border/30 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">{cat.emoji}</span>
+            <div>
+              <p className="font-display font-black text-sm text-foreground">
+                {cat.label}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {isLoading ? "Loading…" : `${filtered.length} styles`}
+              </p>
+            </div>
+          </div>
+          <a
+            href={`/shop?category=${cat.key}`}
+            data-ocid={`shop.category_products.view_all.${cat.key.toLowerCase()}`}
+            className="flex items-center gap-1 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
+          >
+            See all
+            <ChevronRight size={13} />
+          </a>
+        </div>
+
+        {/* Price filter row inside the panel */}
+        <div className="px-4 py-3 border-b border-border/20">
+          <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground mb-2.5">
+            Filter by price
+          </p>
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+            {PRICE_OPTIONS.map((opt) => (
+              <PriceChip
+                key={opt.key}
+                label={opt.label}
+                emoji={opt.emoji}
+                active={priceFilter === opt.key}
+                color={opt.color}
+                onClick={() => setPriceFilter(opt.key)}
+                ocid={`shop.inline.price.${opt.key}.${cat.key.toLowerCase()}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Products */}
+        <div className="p-3 pb-5">
+          {isLoading ? (
+            <div className="grid grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((k) => (
+                <div key={k} className="space-y-2">
+                  <Skeleton className="aspect-[4/5] w-full rounded-xl" />
+                  <Skeleton className="h-3 w-3/4 rounded" />
+                  <Skeleton className="h-3 w-1/2 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div
+              data-ocid={`shop.category_products.empty_state.${cat.key.toLowerCase()}`}
+              className="flex flex-col items-center justify-center py-12 text-center"
+            >
+              <div className="w-12 h-12 rounded-xl bg-muted/60 flex items-center justify-center mb-3">
+                <Shirt size={22} className="text-muted-foreground" />
+              </div>
+              <p className="font-display font-bold text-sm text-foreground mb-1">
+                No products in this range
+              </p>
+              <button
+                type="button"
+                data-ocid={`shop.category_products.clear_price.${cat.key.toLowerCase()}`}
+                onClick={() => setPriceFilter("all")}
+                className="text-xs font-bold text-primary hover:text-primary/70 mt-1"
+              >
+                ✕ Clear price filter
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {gridItems.map((item) => {
+                if (item.type === "featured") {
+                  return (
+                    <div
+                      key={`featured-${item.featuredIndex}`}
+                      onClick={() => {
+                        try {
+                          sessionStorage.setItem(SESSION_CATEGORY_KEY, cat.key);
+                        } catch {
+                          /* noop */
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          try {
+                            sessionStorage.setItem(
+                              SESSION_CATEGORY_KEY,
+                              cat.key,
+                            );
+                          } catch {
+                            /* noop */
+                          }
+                        }
+                      }}
+                    >
+                      <FeaturedProductCard
+                        product={item.product}
+                        index={item.featuredIndex}
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={item.product.id}
+                    onClick={() => {
+                      try {
+                        sessionStorage.setItem(SESSION_CATEGORY_KEY, cat.key);
+                      } catch {
+                        /* noop */
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        try {
+                          sessionStorage.setItem(SESSION_CATEGORY_KEY, cat.key);
+                        } catch {
+                          /* noop */
+                        }
+                      }
+                    }}
+                  >
+                    <ProductCard
+                      product={item.product}
+                      index={item.gridIndex}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Shop Page ─────────────────────────────────────────────────────────────────
+export default function Shop() {
+  const { data: products = [], isLoading } = useProducts();
+  const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
+  const [priceFilter, setPriceFilter] = useState<PriceKey>("all");
+  const expandedRef = useRef<HTMLDivElement>(null);
+
+  // Sync category from URL on mount; also restore from sessionStorage (back navigation)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get("category");
+    if (c && ["Men", "Women", "Handicrafts", "Other"].includes(c)) {
+      setActiveCategory(c as CategoryKey);
+      return;
+    }
+    // Restore from sessionStorage when coming back from product detail
+    try {
+      const saved = sessionStorage.getItem(SESSION_CATEGORY_KEY);
+      if (saved && ["Men", "Women", "Handicrafts", "Other"].includes(saved)) {
+        setActiveCategory(saved as CategoryKey);
+        sessionStorage.removeItem(SESSION_CATEGORY_KEY);
+      }
+    } catch {
+      // sessionStorage may be unavailable
+    }
+    const p = params.get("price");
+    if (p && ["500", "1000", "1500", "2000", "2000plus"].includes(p)) {
+      setPriceFilter(p as PriceKey);
+    }
+  }, []);
+
+  function handleCategoryToggle(key: CategoryKey) {
+    if (activeCategory === key) {
+      setActiveCategory("all");
+    } else {
+      setActiveCategory(key);
+      setPriceFilter("all");
+      setTimeout(() => {
+        expandedRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      }, 100);
+    }
+  }
+
+  const activeCategoryDef =
+    CATEGORY_CARDS.find((c) => c.key === activeCategory) ?? null;
+  const selectedIndex =
+    activeCategory !== "all"
+      ? CATEGORY_CARDS.findIndex((c) => c.key === activeCategory)
+      : -1;
+  const row0HasExpanded = selectedIndex === 0 || selectedIndex === 1;
+  const row1HasExpanded = selectedIndex === 2 || selectedIndex === 3;
+
+  const headerLabel =
+    activeCategory !== "all"
+      ? (CATEGORY_CARDS.find((c) => c.key === activeCategory)?.label ??
+        "All Drops")
+      : "All Drops";
 
   return (
-    <div data-ocid="shop.page" className="min-h-screen">
+    <div data-ocid="shop.page" className="min-h-screen pb-24">
       {/* Header */}
       <div className="px-4 pt-6 pb-4 border-b border-border/30 bg-card">
         <h1 className="font-display font-black text-3xl text-foreground leading-tight uppercase tracking-tight">
-          All Drops
+          {headerLabel}
         </h1>
         <p className="text-xs text-muted-foreground mt-1">
           {isLoading ? "Loading…" : `${products.length} styles available`}
         </p>
       </div>
 
-      {/* Filter Bar — collapses on scroll down, fully hidden to avoid blank space */}
-      <div
-        ref={filterBarRef}
-        data-ocid="shop.filter_bar"
-        className={cn(
-          "sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border/30 px-4 py-3 space-y-3",
-          "transition-all duration-300 ease-in-out overflow-hidden",
-          filterBarVisible
-            ? "max-h-[200px] opacity-100 visible"
-            : "max-h-0 opacity-0 invisible py-0",
-        )}
-      >
-        {/* Gender filters */}
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">
-            For
-          </p>
-          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
-            {GENDER_OPTIONS.map((opt) => (
-              <GenderPill
-                key={opt.key}
-                label={opt.label}
-                emoji={opt.emoji}
-                active={genderFilter === opt.key}
-                onClick={() => setGenderFilter(opt.key)}
-                ocid={`shop.filter.gender.${opt.key}`}
+      {/* Category Card Accordion Grid */}
+      <div className="px-4 pt-5 pb-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-3">
+          Browse by Category
+        </p>
+
+        {/* 2-col grid with accordion inject after rows */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Row 0 */}
+          {CATEGORY_CARDS.slice(0, 2).map((cat) => (
+            <ShopCategoryCard
+              key={cat.key}
+              cat={cat}
+              isActive={activeCategory === cat.key}
+              onToggle={() => handleCategoryToggle(cat.key)}
+            />
+          ))}
+
+          {/* Row 0 accordion */}
+          <AnimatePresence>
+            {row0HasExpanded && activeCategoryDef && (
+              <InlineProducts
+                key={`shop-expand-row0-${activeCategory}`}
+                products={products}
+                isLoading={isLoading}
+                cat={activeCategoryDef}
+                priceFilter={priceFilter}
+                setPriceFilter={setPriceFilter}
+                expandedRef={expandedRef}
               />
-            ))}
-          </div>
-        </div>
-
-        {/* Price filters */}
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">
-            Price
-          </p>
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-            {PRICE_OPTIONS.map((opt) => (
-              <FilterChip
-                key={opt.key}
-                label={opt.label}
-                emoji={opt.emoji}
-                active={priceFilter === opt.key}
-                onClick={() => setPriceFilter(opt.key)}
-                ocid={`shop.filter.price.${opt.key}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Product count + clear */}
-        <div className="flex items-center justify-between pt-0.5">
-          <p
-            data-ocid="shop.product_count"
-            className="text-xs text-muted-foreground"
-          >
-            {isLoading
-              ? "Loading…"
-              : hasActiveFilters
-                ? `${filtered.length} product${filtered.length !== 1 ? "s" : ""} found`
-                : `${filtered.length} styles`}
-          </p>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              data-ocid="shop.filter.clear_button"
-              onClick={() => {
-                setPriceFilter("all");
-                setGenderFilter("all");
-              }}
-              className="text-[11px] font-black text-primary hover:text-primary/70 transition-smooth"
-            >
-              ✕ Clear filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Grid */}
-      <div className="px-4 pt-5 pb-24">
-        {isLoading ? (
-          <div
-            data-ocid="shop.products.loading_state"
-            className="grid grid-cols-2 gap-3"
-          >
-            {Array.from({ length: 6 }, (_, i) => `skel-${i}`).map((key) => (
-              <div key={key} className="space-y-2">
-                <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
-                <Skeleton className="h-4 w-3/4 rounded" />
-                <Skeleton className="h-4 w-1/2 rounded" />
-                <Skeleton className="h-8 w-full rounded-lg" />
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div
-            data-ocid="shop.products.empty_state"
-            className="flex flex-col items-center justify-center py-20 text-center"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
-              <Shirt size={28} className="text-muted-foreground" />
-            </div>
-            {hasActiveFilters ? (
-              <>
-                <p className="font-display font-bold text-base text-foreground mb-1">
-                  No products found for these filters
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Try adjusting your price or gender filter.
-                </p>
-                <button
-                  type="button"
-                  data-ocid="shop.empty_state.clear_button"
-                  onClick={() => {
-                    setPriceFilter("all");
-                    setGenderFilter("all");
-                  }}
-                  className="btn-primary text-sm py-2 px-5"
-                >
-                  Clear Filters
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="font-display font-bold text-base text-foreground mb-1">
-                  Drops Coming Soon
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  New styles are on the way — check back soon.
-                </p>
-              </>
             )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {gridItems.map((item) => {
-              if (item.type === "featured") {
-                return (
-                  <FeaturedProductCard
-                    key={`featured-${item.featuredIndex}`}
-                    product={item.product}
-                    index={item.featuredIndex}
-                  />
-                );
-              }
-              return (
-                <ProductCard
-                  key={item.product.id}
-                  product={item.product}
-                  index={item.gridIndex}
-                />
-              );
-            })}
-          </div>
+          </AnimatePresence>
+
+          {/* Row 1 */}
+          {CATEGORY_CARDS.slice(2, 4).map((cat) => (
+            <ShopCategoryCard
+              key={cat.key}
+              cat={cat}
+              isActive={activeCategory === cat.key}
+              onToggle={() => handleCategoryToggle(cat.key)}
+            />
+          ))}
+
+          {/* Row 1 accordion */}
+          <AnimatePresence>
+            {row1HasExpanded && activeCategoryDef && (
+              <InlineProducts
+                key={`shop-expand-row1-${activeCategory}`}
+                products={products}
+                isLoading={isLoading}
+                cat={activeCategoryDef}
+                priceFilter={priceFilter}
+                setPriceFilter={setPriceFilter}
+                expandedRef={expandedRef}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+
+        {activeCategory !== "all" && (
+          <button
+            type="button"
+            data-ocid="shop.category.clear_button"
+            onClick={() => setActiveCategory("all")}
+            className="mt-3 w-full text-center text-[11px] font-black text-primary hover:text-primary/70 transition-smooth"
+          >
+            ✕ Show all categories
+          </button>
         )}
       </div>
+
+      {/* When no category is selected, show a subtle hint only */}
+      {activeCategory === "all" && (
+        <div className="px-4 pt-5 pb-10 text-center">
+          <p className="text-muted-foreground text-sm">
+            👆 Tap a category above to browse products &amp; filter by price
+          </p>
+        </div>
+      )}
     </div>
   );
 }

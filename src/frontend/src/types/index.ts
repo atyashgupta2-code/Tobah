@@ -12,6 +12,11 @@ export type {
   OrderId,
   SellerId,
   ProductId,
+  Coupon,
+  CouponId,
+  CouponInput,
+  ModelPhoto,
+  ModelPhotoId,
 } from "../backend.d";
 
 export {

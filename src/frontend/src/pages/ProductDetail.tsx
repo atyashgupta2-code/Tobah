@@ -19,8 +19,13 @@ import { USPBadge } from "../components/USPBadge";
 import { useCart } from "../hooks/useCart";
 import { DeliveryOption, useProduct } from "../hooks/useProducts";
 
+/**
+ * Format a raw backend price (stored as bigint × 100, e.g. 10000 = ₹100)
+ * into a human-readable INR string.
+ * Always divide by 100 before formatting so the value matches what ProductCard displays.
+ */
 function formatINR(price: bigint): string {
-  return `₹${Number(price).toLocaleString("en-IN")}`;
+  return `₹${(Number(price) / 100).toLocaleString("en-IN")}`;
 }
 
 function getDeliveryDate(option: DeliveryOption): string {
@@ -332,7 +337,7 @@ export default function ProductDetail() {
         {/* ── Inline Quick Buy (visible above fold on mobile) ── */}
         <div className="flex gap-3" data-ocid="product_detail.quick_buy_row">
           <Button
-            className="flex-1 btn-accent font-display font-black uppercase tracking-wider text-sm flex items-center justify-center gap-2 h-12"
+            className="flex-1 btn-pink font-display font-black uppercase tracking-wider text-sm flex items-center justify-center gap-2 h-12"
             disabled={isOutOfStock || !selectedSize}
             onClick={handleBuyNow}
             data-ocid="product_detail.quick_buy_now_button"
@@ -465,7 +470,7 @@ export default function ProductDetail() {
           <Button
             className={cn(
               "flex-1 font-display font-black uppercase tracking-wider text-sm transition-smooth h-12",
-              addedToCart ? "bg-green-600/80 text-foreground" : "btn-primary",
+              addedToCart ? "bg-green-600/80 text-foreground" : "btn-white",
             )}
             disabled={isOutOfStock || !selectedSize}
             onClick={handleAddToCart}
@@ -504,7 +509,7 @@ export default function ProductDetail() {
 
           {/* Buy Now */}
           <Button
-            className="flex-1 btn-accent font-display font-black uppercase tracking-wider text-sm flex items-center justify-center gap-2 h-12"
+            className="flex-1 btn-pink font-display font-black uppercase tracking-wider text-sm flex items-center justify-center gap-2 h-12"
             disabled={isOutOfStock || !selectedSize}
             onClick={handleBuyNow}
             data-ocid="product_detail.buy_now_button"
