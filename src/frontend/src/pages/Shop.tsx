@@ -11,7 +11,7 @@ import { useProducts } from "../hooks/useProducts";
 const SESSION_CATEGORY_KEY = "tbah_last_category";
 
 type PriceKey = "all" | "500" | "1000" | "1500" | "2000" | "2000plus";
-type CategoryKey = "all" | "Men" | "Women" | "Handicrafts" | "Other";
+type CategoryKey = "all" | "Men" | "Women" | "Handicrafts" | "Other" | "Shoes";
 
 const PRICE_OPTIONS: {
   label: string;
@@ -52,21 +52,40 @@ const PRICE_OPTIONS: {
   },
 ];
 
+interface SubFilter {
+  key: string;
+  label: string;
+}
+
 interface CategoryCardDef {
-  key: CategoryKey;
+  key: Exclude<CategoryKey, "all">;
   label: string;
   emoji: string;
   colorClass: string;
   accentColor: string;
   genderValues: string[];
   bgImage: string;
+  subFilters?: SubFilter[];
 }
+
+const OTHER_SUB_FILTERS: SubFilter[] = [
+  { key: "all", label: "All" },
+  { key: "Bedsheets", label: "Bedsheets" },
+  { key: "Artificial Jewellery", label: "Artificial Jewellery" },
+  { key: "Other", label: "Other" },
+];
+
+const SHOES_SUB_FILTERS: SubFilter[] = [
+  { key: "all", label: "All" },
+  { key: "Men", label: "Men" },
+  { key: "Women", label: "Women" },
+];
 
 const CATEGORY_CARDS: CategoryCardDef[] = [
   {
     key: "Men",
     label: "Men",
-    emoji: "👟",
+    emoji: "👔",
     colorClass: "category-card-men",
     accentColor: "oklch(0.68 0.12 265)",
     genderValues: ["Men", "Unisex"],
@@ -80,7 +99,6 @@ const CATEGORY_CARDS: CategoryCardDef[] = [
     colorClass: "category-card-women",
     accentColor: "oklch(0.72 0.14 330)",
     genderValues: ["Women", "Unisex"],
-    // Swapped: Women now gets Men's old image
     bgImage:
       "/assets/img_20260424_230920-019dc0a8-534a-758d-97ea-b85bf7b03f3d.jpg",
   },
@@ -91,7 +109,6 @@ const CATEGORY_CARDS: CategoryCardDef[] = [
     colorClass: "category-card-handicrafts",
     accentColor: "oklch(0.75 0.14 75)",
     genderValues: ["Handicrafts"],
-    // Swapped: Handicrafts now gets Deliver Today's old image
     bgImage:
       "/assets/img_20260424_230751-019dc0a7-8e0c-7057-8b25-d11bf115a132.jpg",
   },
@@ -102,9 +119,19 @@ const CATEGORY_CARDS: CategoryCardDef[] = [
     colorClass: "category-card-other",
     accentColor: "oklch(0.65 0.11 295)",
     genderValues: ["Other"],
-    // Swapped: Other now gets Pay When It Arrives' old image (jewelry)
     bgImage:
       "/assets/img_20260424_230559-019dc0a8-1cbd-719a-a372-78ada809d196.jpg",
+    subFilters: OTHER_SUB_FILTERS,
+  },
+  {
+    key: "Shoes",
+    label: "Shoes",
+    emoji: "👟",
+    colorClass: "category-card-shoes",
+    accentColor: "oklch(0.70 0.18 55)",
+    genderValues: ["Shoes"],
+    bgImage: "/assets/shoes-banner.png",
+    subFilters: SHOES_SUB_FILTERS,
   },
 ];
 
@@ -180,6 +207,56 @@ function PriceChip({
   );
 }
 
+// ─── Sub-classification Filter Tabs ────────────────────────────────────────────
+interface SubFilterTabsProps {
+  filters: SubFilter[];
+  active: string;
+  onChange: (key: string) => void;
+  ocidPrefix: string;
+}
+
+function SubFilterTabs({
+  filters,
+  active,
+  onChange,
+  ocidPrefix,
+}: SubFilterTabsProps) {
+  return (
+    <div className="px-4 pt-3 pb-2 border-b border-border/20">
+      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground mb-2">
+        Filter by type
+      </p>
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
+        {filters.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            data-ocid={`${ocidPrefix}.subtab.${f.key.toLowerCase().replace(/\s+/g, "_")}`}
+            onClick={() => onChange(f.key)}
+            className={cn(
+              "shrink-0 px-3 py-1.5 rounded-full text-[11px] font-black border transition-colors duration-150 whitespace-nowrap",
+              active === f.key
+                ? "text-foreground border-transparent"
+                : "bg-card/50 text-muted-foreground border-border/40 hover:border-border hover:text-foreground",
+            )}
+            style={
+              active === f.key
+                ? {
+                    background:
+                      "linear-gradient(135deg, oklch(0.62 0.28 315), oklch(0.62 0.28 315 / 0.75))",
+                    boxShadow: "0 0 12px 2px oklch(0.62 0.28 315 / 0.35)",
+                  }
+                : undefined
+            }
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Category Card ─────────────────────────────────────────────────────────────
 interface ShopCategoryCardProps {
   cat: CategoryCardDef;
@@ -208,7 +285,6 @@ function ShopCategoryCard({ cat, isActive, onToggle }: ShopCategoryCardProps) {
       }
       aria-pressed={isActive}
     >
-      {/* Background photo — brighter */}
       <img
         src={cat.bgImage}
         alt={cat.label}
@@ -218,7 +294,6 @@ function ShopCategoryCard({ cat, isActive, onToggle }: ShopCategoryCardProps) {
         height={200}
         style={{ filter: "brightness(1.1) saturate(1.0)" }}
       />
-      {/* Lighter overlay so photo shows clearly */}
       <div
         className="absolute inset-0"
         style={{
@@ -227,12 +302,10 @@ function ShopCategoryCard({ cat, isActive, onToggle }: ShopCategoryCardProps) {
             : "linear-gradient(135deg, rgba(0,0,0,0.40), rgba(0,0,0,0.22))",
         }}
       />
-      {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center gap-2 py-5 px-3 h-full min-h-[130px]">
         <span className="text-4xl leading-none drop-shadow-sm">
           {cat.emoji}
         </span>
-        {/* Stylish label */}
         <span
           className="font-display leading-none text-center"
           style={{
@@ -249,7 +322,6 @@ function ShopCategoryCard({ cat, isActive, onToggle }: ShopCategoryCardProps) {
           {cat.label}
         </span>
       </div>
-      {/* Open/close indicator */}
       <span
         className="absolute bottom-2 right-2 w-5 h-5 rounded-full flex items-center justify-center z-10"
         style={{ background: "rgba(255,255,255,0.85)" }}
@@ -307,12 +379,20 @@ function InlineProducts({
   setPriceFilter,
   expandedRef,
 }: InlineProductsProps) {
+  const [subFilter, setSubFilter] = useState<string>("all");
+
+  const hasSubFilters = cat.subFilters && cat.subFilters.length > 0;
+
   const filtered = useMemo(() => {
-    return products.filter(
-      (p) =>
-        matchesCategory(p, cat.genderValues) && matchesPrice(p, priceFilter),
-    );
-  }, [products, cat.genderValues, priceFilter]);
+    return products.filter((p) => {
+      if (!matchesCategory(p, cat.genderValues)) return false;
+      if (!matchesPrice(p, priceFilter)) return false;
+      if (hasSubFilters && subFilter !== "all") {
+        return (p.subcategory ?? "") === subFilter;
+      }
+      return true;
+    });
+  }, [products, cat.genderValues, priceFilter, subFilter, hasSubFilters]);
 
   const bestSeller = useMemo<Product | null>(() => {
     if (products.length === 0) return null;
@@ -366,6 +446,16 @@ function InlineProducts({
           </a>
         </div>
 
+        {/* Sub-classification tabs (for Shoes and Other) */}
+        {hasSubFilters && (
+          <SubFilterTabs
+            filters={cat.subFilters!}
+            active={subFilter}
+            onChange={setSubFilter}
+            ocidPrefix={`shop.category_products.${cat.key.toLowerCase()}`}
+          />
+        )}
+
         {/* Price filter row inside the panel */}
         <div className="px-4 py-3 border-b border-border/20">
           <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground mb-2.5">
@@ -409,14 +499,27 @@ function InlineProducts({
               <p className="font-display font-bold text-sm text-foreground mb-1">
                 No products in this range
               </p>
-              <button
-                type="button"
-                data-ocid={`shop.category_products.clear_price.${cat.key.toLowerCase()}`}
-                onClick={() => setPriceFilter("all")}
-                className="text-xs font-bold text-primary hover:text-primary/70 mt-1"
-              >
-                ✕ Clear price filter
-              </button>
+              <div className="flex flex-col gap-1.5 items-center mt-1">
+                {priceFilter !== "all" && (
+                  <button
+                    type="button"
+                    data-ocid={`shop.category_products.clear_price.${cat.key.toLowerCase()}`}
+                    onClick={() => setPriceFilter("all")}
+                    className="text-xs font-bold text-primary hover:text-primary/70"
+                  >
+                    ✕ Clear price filter
+                  </button>
+                )}
+                {hasSubFilters && subFilter !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setSubFilter("all")}
+                    className="text-xs font-bold text-primary hover:text-primary/70"
+                  >
+                    ✕ Show all {cat.label}
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -498,14 +601,16 @@ export default function Shop() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const c = params.get("category");
-    if (c && ["Men", "Women", "Handicrafts", "Other"].includes(c)) {
+    if (c && ["Men", "Women", "Handicrafts", "Other", "Shoes"].includes(c)) {
       setActiveCategory(c as CategoryKey);
       return;
     }
-    // Restore from sessionStorage when coming back from product detail
     try {
       const saved = sessionStorage.getItem(SESSION_CATEGORY_KEY);
-      if (saved && ["Men", "Women", "Handicrafts", "Other"].includes(saved)) {
+      if (
+        saved &&
+        ["Men", "Women", "Handicrafts", "Other", "Shoes"].includes(saved)
+      ) {
         setActiveCategory(saved as CategoryKey);
         sessionStorage.removeItem(SESSION_CATEGORY_KEY);
       }
@@ -539,8 +644,11 @@ export default function Shop() {
     activeCategory !== "all"
       ? CATEGORY_CARDS.findIndex((c) => c.key === activeCategory)
       : -1;
+
+  // Row layout: [0,1], [2,3], [4 centered]
   const row0HasExpanded = selectedIndex === 0 || selectedIndex === 1;
   const row1HasExpanded = selectedIndex === 2 || selectedIndex === 3;
+  const row2HasExpanded = selectedIndex === 4;
 
   const headerLabel =
     activeCategory !== "all"
@@ -568,7 +676,7 @@ export default function Shop() {
 
         {/* 2-col grid with accordion inject after rows */}
         <div className="grid grid-cols-2 gap-3">
-          {/* Row 0 */}
+          {/* Row 0: Men, Women */}
           {CATEGORY_CARDS.slice(0, 2).map((cat) => (
             <ShopCategoryCard
               key={cat.key}
@@ -593,7 +701,7 @@ export default function Shop() {
             )}
           </AnimatePresence>
 
-          {/* Row 1 */}
+          {/* Row 1: Handicrafts, Other */}
           {CATEGORY_CARDS.slice(2, 4).map((cat) => (
             <ShopCategoryCard
               key={cat.key}
@@ -608,6 +716,33 @@ export default function Shop() {
             {row1HasExpanded && activeCategoryDef && (
               <InlineProducts
                 key={`shop-expand-row1-${activeCategory}`}
+                products={products}
+                isLoading={isLoading}
+                cat={activeCategoryDef}
+                priceFilter={priceFilter}
+                setPriceFilter={setPriceFilter}
+                expandedRef={expandedRef}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Row 2: Shoes — same size as others, shifted right to sit between/under Handicrafts and Other */}
+          <div className="col-span-2 flex justify-end pr-[2px]">
+            <div className="w-[calc(50%-6px)]">
+              <ShopCategoryCard
+                key={CATEGORY_CARDS[4].key}
+                cat={CATEGORY_CARDS[4]}
+                isActive={activeCategory === CATEGORY_CARDS[4].key}
+                onToggle={() => handleCategoryToggle(CATEGORY_CARDS[4].key)}
+              />
+            </div>
+          </div>
+
+          {/* Row 2 accordion (Shoes) */}
+          <AnimatePresence>
+            {row2HasExpanded && activeCategoryDef && (
+              <InlineProducts
+                key={`shop-expand-row2-${activeCategory}`}
                 products={products}
                 isLoading={isLoading}
                 cat={activeCategoryDef}

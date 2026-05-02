@@ -60,6 +60,11 @@ mixin (
     Lib.setProductTrending(products, productId, trending);
   };
 
+  /// Admin-only: set or unset a product as a New Arrival.
+  public shared ({ caller }) func setNewArrival(productId : Types.ProductId, isNewArrival : Bool) : async { #ok : Types.Product; #err : Text } {
+    Lib.setNewArrival(products, productId, isNewArrival);
+  };
+
   // ─── Orders ────────────────────────────────────────────────────────────────
 
   public shared func createOrder(
@@ -225,6 +230,14 @@ mixin (
   /// Admin toggles a coupon active/inactive.
   public shared ({ caller }) func toggleCoupon(id : Types.CouponId) : async { #ok : Types.Coupon; #err : Text } {
     Lib.toggleCoupon(coupons, id);
+  };
+
+  /// Returns order counts for a coupon code.
+  /// totalOrders = all orders that used the code.
+  /// successfulOrders = orders with non-cancelled, non-rejected, non-pending status.
+  /// Returns null only if code is empty.
+  public query func getCouponOrderStats(code : Text) : async ?{ couponCode : Text; totalOrders : Nat; successfulOrders : Nat } {
+    Lib.getCouponOrderStats(orders, code);
   };
 
   // ─── Model Showcase ────────────────────────────────────────────────────────

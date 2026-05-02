@@ -81,6 +81,7 @@ export const Coupon = IDL.Record({
 });
 export const ProductInput = IDL.Record({
   'fulfillmentBy' : FulfillmentBy,
+  'subcategory' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'description' : IDL.Text,
   'hasFitAndTry' : IDL.Bool,
@@ -98,8 +99,10 @@ export const ProductInput = IDL.Record({
 export const Product = IDL.Record({
   'id' : ProductId,
   'fulfillmentBy' : FulfillmentBy,
+  'subcategory' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'createdAt' : IDL.Int,
+  'isNewArrival' : IDL.Bool,
   'description' : IDL.Text,
   'hasFitAndTry' : IDL.Bool,
   'sizes' : IDL.Vec(IDL.Text),
@@ -232,6 +235,19 @@ export const idlService = IDL.Service({
     ),
   'getAllNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
   'getCoupon' : IDL.Func([IDL.Text], [IDL.Opt(Coupon)], ['query']),
+  'getCouponOrderStats' : IDL.Func(
+      [IDL.Text],
+      [
+        IDL.Opt(
+          IDL.Record({
+            'couponCode' : IDL.Text,
+            'totalOrders' : IDL.Nat,
+            'successfulOrders' : IDL.Nat,
+          })
+        ),
+      ],
+      ['query'],
+    ),
   'getCustomer' : IDL.Func([IDL.Text], [IDL.Opt(Customer)], ['query']),
   'getNewArrivals' : IDL.Func([], [IDL.Vec(Product)], ['query']),
   'getNotifications' : IDL.Func(
@@ -269,6 +285,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'removeSeller' : IDL.Func([SellerId], [IDL.Bool], []),
+  'setNewArrival' : IDL.Func(
+      [ProductId, IDL.Bool],
+      [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],
+      [],
+    ),
   'setProductTrending' : IDL.Func(
       [ProductId, IDL.Bool],
       [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],
@@ -368,6 +389,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const ProductInput = IDL.Record({
     'fulfillmentBy' : FulfillmentBy,
+    'subcategory' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'description' : IDL.Text,
     'hasFitAndTry' : IDL.Bool,
@@ -385,8 +407,10 @@ export const idlFactory = ({ IDL }) => {
   const Product = IDL.Record({
     'id' : ProductId,
     'fulfillmentBy' : FulfillmentBy,
+    'subcategory' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'createdAt' : IDL.Int,
+    'isNewArrival' : IDL.Bool,
     'description' : IDL.Text,
     'hasFitAndTry' : IDL.Bool,
     'sizes' : IDL.Vec(IDL.Text),
@@ -519,6 +543,19 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getAllNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
     'getCoupon' : IDL.Func([IDL.Text], [IDL.Opt(Coupon)], ['query']),
+    'getCouponOrderStats' : IDL.Func(
+        [IDL.Text],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'couponCode' : IDL.Text,
+              'totalOrders' : IDL.Nat,
+              'successfulOrders' : IDL.Nat,
+            })
+          ),
+        ],
+        ['query'],
+      ),
     'getCustomer' : IDL.Func([IDL.Text], [IDL.Opt(Customer)], ['query']),
     'getNewArrivals' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'getNotifications' : IDL.Func(
@@ -560,6 +597,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'removeSeller' : IDL.Func([SellerId], [IDL.Bool], []),
+    'setNewArrival' : IDL.Func(
+        [ProductId, IDL.Bool],
+        [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],
+        [],
+      ),
     'setProductTrending' : IDL.Func(
         [ProductId, IDL.Bool],
         [IDL.Variant({ 'ok' : Product, 'err' : IDL.Text })],

@@ -4,19 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  ImageIcon,
-  Loader2,
-  Upload,
-  X,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ExternalLink, Info } from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ExternalBlob, createActor } from "../../backend";
 import { FulfillmentBy } from "../../backend.d";
 import type { ProductInput } from "../../backend.d";
 import { useProduct } from "../../hooks/useProducts";
@@ -34,6 +26,7 @@ interface FormState {
   sizes: string;
   stock: string;
   gender: string;
+  subcategory: string;
   hasSameDayDelivery: boolean;
   hasFitAndTry: boolean;
 }
@@ -47,6 +40,7 @@ const defaultForm: FormState = {
   sizes: "",
   stock: "",
   gender: "Unisex",
+  subcategory: "",
   hasSameDayDelivery: false,
   hasFitAndTry: false,
 };
@@ -60,10 +54,94 @@ function FieldError({ message, id }: { message?: string; id: string }) {
   );
 }
 
-type UploadState = "idle" | "uploading" | "done" | "error";
+// Categories / genders shown as pill buttons
+const GENDERS = [
+  "Men",
+  "Women",
+  "Unisex",
+  "Handicrafts",
+  "Shoes",
+  "Other",
+] as const;
 
-// Extended genders including Handicrafts and Other
-const GENDERS = ["Men", "Women", "Unisex", "Handicrafts", "Other"] as const;
+// Step-by-step guidance for non-technical sellers — Chrome-specific
+const IMAGE_UPLOAD_STEPS: { id: string; text: React.ReactNode }[] = [
+  {
+    id: "chrome",
+    text: (
+      <>
+        Open{" "}
+        <a
+          href="https://imglink.cc/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline"
+        >
+          https://imglink.cc/
+        </a>{" "}
+        in <strong className="text-foreground">Chrome</strong> (recommended for
+        best experience)
+      </>
+    ),
+  },
+  {
+    id: "upload",
+    text: (
+      <>
+        Upload your product photo(s) — you can{" "}
+        <strong className="text-foreground">upload all photos at once</strong>
+      </>
+    ),
+  },
+  {
+    id: "scroll",
+    text: (
+      <>
+        After uploading,{" "}
+        <strong className="text-foreground">scroll below each photo</strong> —
+        you will see{" "}
+        <strong className="text-amber-400">"Embedded Codes"</strong> written
+        there
+      </>
+    ),
+  },
+  {
+    id: "embedded",
+    text: (
+      <>
+        Click on <strong className="text-amber-400">"Embedded Codes"</strong> —
+        it will expand showing different URL types
+      </>
+    ),
+  },
+  {
+    id: "direct",
+    text: (
+      <>
+        Look for <strong className="text-green-400">"Direct URL"</strong> and
+        click on it to copy it
+      </>
+    ),
+  },
+  {
+    id: "paste",
+    text: (
+      <>
+        Paste that <strong className="text-green-400">Direct URL</strong> in the
+        link field below
+      </>
+    ),
+  },
+] as unknown as { id: string; text: React.ReactNode }[];
+const SUBCATEGORIES: Record<string, string[]> = {
+  Shoes: ["Men", "Women"],
+  Other: ["Bedsheets", "Artificial Jewellery", "Other"],
+};
+
+/** Returns true if this gender value needs a subcategory picker */
+function needsSubcategory(gender: string): boolean {
+  return gender === "Shoes" || gender === "Other";
+}
 
 export default function SellerProductForm() {
   const navigate = useNavigate();
@@ -83,16 +161,12 @@ export default function SellerProductForm() {
   );
   const createProduct = useSellerCreateProduct();
   const updateProduct = useSellerUpdateProduct();
-  const { actor } = useActor(createActor);
 
   const [form, setForm] = useState<FormState>(defaultForm);
+  const [previewSrc, setPreviewSrc] = useState<string>("");
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
   >({});
-  const [uploadState, setUploadState] = useState<UploadState>("idle");
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [previewSrc, setPreviewSrc] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isEdit && existingProduct) {
@@ -105,6 +179,7 @@ export default function SellerProductForm() {
         sizes: existingProduct.sizes.join(", "),
         stock: String(Number(existingProduct.stock)),
         gender: existingProduct.gender || "Unisex",
+        subcategory: existingProduct.subcategory ?? "",
         hasSameDayDelivery: existingProduct.hasSameDayDelivery,
         hasFitAndTry: existingProduct.hasFitAndTry,
       });
@@ -117,66 +192,32 @@ export default function SellerProductForm() {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
+  function handleGenderChange(g: string) {
+    // When gender changes, reset subcategory
+    setForm((prev) => ({ ...prev, gender: g, subcategory: "" }));
+    if (errors.gender) setErrors((prev) => ({ ...prev, gender: undefined }));
+  }
+
   function validate(): boolean {
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!form.name.trim()) next.name = "Product name is required";
     const priceVal = Number.parseFloat(form.price);
     if (!form.price || Number.isNaN(priceVal) || priceVal <= 0)
       next.price = "Price must be greater than 0";
-    if (!form.imageUrl.trim()) next.imageUrl = "Product image is required";
+    if (!form.imageUrl.trim()) next.imageUrl = "Product image URL is required";
     const stockVal = Number.parseInt(form.stock, 10);
     if (!form.stock || Number.isNaN(stockVal) || stockVal < 0)
       next.stock = "Stock must be 0 or more";
+    if (needsSubcategory(form.gender) && !form.subcategory)
+      next.subcategory = "Please select a subcategory";
     setErrors(next);
     return Object.keys(next).length === 0;
-  }
-
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewSrc(objectUrl);
-    setUploadState("uploading");
-    setUploadProgress(0);
-    try {
-      if (!actor)
-        throw new Error("Actor not ready — please wait and try again");
-      const buffer = (await file.arrayBuffer()) as ArrayBuffer;
-      const bytes = new Uint8Array(buffer) as Uint8Array<ArrayBuffer>;
-      const blob = ExternalBlob.fromBytes(bytes).withUploadProgress((pct) => {
-        setUploadProgress(pct);
-      });
-      type Uploader = {
-        _uploadFile: (f: ExternalBlob) => Promise<Uint8Array<ArrayBuffer>>;
-      };
-      const uploader = actor as unknown as Uploader;
-      const uploadedBytes = await uploader._uploadFile(blob);
-      const uploaded = ExternalBlob.fromBytes(uploadedBytes);
-      const url = uploaded.getDirectURL();
-      set("imageUrl", url);
-      setPreviewSrc(url);
-      setUploadState("done");
-      toast.success("Photo uploaded successfully!");
-    } catch (err) {
-      setUploadState("error");
-      toast.error(err instanceof Error ? err.message : "Upload failed");
-    }
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  function handleRemoveImage() {
-    setPreviewSrc("");
-    set("imageUrl", "");
-    setUploadState("idle");
-    setUploadProgress(0);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
-    // Delivery fulfillment is NOT chosen at listing time — seller picks it when accepting an order.
-    // Default to AdminFulfilled as a neutral placeholder; the real choice happens at order acceptance.
+
     const input: ProductInput = {
       name: form.name.trim(),
       description: form.description.trim(),
@@ -189,6 +230,7 @@ export default function SellerProductForm() {
         .filter(Boolean),
       stock: BigInt(Number.parseInt(form.stock, 10)),
       gender: form.gender,
+      subcategory: needsSubcategory(form.gender) ? form.subcategory : undefined,
       hasSameDayDelivery: form.hasSameDayDelivery,
       hasFitAndTry: form.hasFitAndTry,
       sellerId,
@@ -196,13 +238,14 @@ export default function SellerProductForm() {
       fulfillmentBy: FulfillmentBy.AdminFulfilled,
       isTrending: false,
     };
+
     try {
       if (isEdit) {
         await updateProduct.mutateAsync({ id: editId!, input });
         toast.success("Product updated!");
       } else {
         await createProduct.mutateAsync(input);
-        toast.success("Product created!");
+        toast.success("Product listed on TBah!");
       }
       navigate({ to: "/seller/dashboard" });
     } catch (err) {
@@ -211,6 +254,7 @@ export default function SellerProductForm() {
   }
 
   const isPending = createProduct.isPending || updateProduct.isPending;
+  const subcategoryOptions = SUBCATEGORIES[form.gender] ?? [];
 
   if (isEdit && loadingProduct) {
     return (
@@ -329,9 +373,9 @@ export default function SellerProductForm() {
             </div>
           </div>
 
-          {/* Category */}
+          {/* Category (text) */}
           <div className="space-y-1.5">
-            <Label htmlFor="pf-category">Category</Label>
+            <Label htmlFor="pf-category">Category / Type</Label>
             <Input
               id="pf-category"
               data-ocid="seller.product_form.category_input"
@@ -356,16 +400,16 @@ export default function SellerProductForm() {
             </p>
           </div>
 
-          {/* Gender / Category */}
+          {/* Gender / Main Category pill buttons */}
           <div className="space-y-2">
-            <Label>Category *</Label>
+            <Label>Section *</Label>
             <div className="flex gap-2 flex-wrap">
               {GENDERS.map((g) => (
                 <button
                   key={g}
                   type="button"
                   data-ocid={`seller.product_form.gender_${g.toLowerCase()}`}
-                  onClick={() => set("gender", g)}
+                  onClick={() => handleGenderChange(g)}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-smooth ${
                     form.gender === g
                       ? "bg-primary text-primary-foreground border-primary"
@@ -378,7 +422,36 @@ export default function SellerProductForm() {
             </div>
           </div>
 
-          {/* Delivery note — informational only */}
+          {/* Subcategory dropdown — only for Shoes and Other */}
+          {needsSubcategory(form.gender) && (
+            <div className="space-y-1.5">
+              <Label htmlFor="pf-subcategory">
+                {form.gender === "Shoes" ? "Shoes For *" : "Other Type *"}
+              </Label>
+              <select
+                id="pf-subcategory"
+                data-ocid="seller.product_form.subcategory_select"
+                value={form.subcategory}
+                onChange={(e) => set("subcategory", e.target.value)}
+                className={`w-full h-10 rounded-md border bg-background px-3 py-2 text-sm text-foreground transition-smooth focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                  errors.subcategory ? "border-destructive" : "border-input"
+                }`}
+              >
+                <option value="">— Select —</option>
+                {subcategoryOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+              <FieldError
+                message={errors.subcategory}
+                id="seller.product_form.subcategory_select.field_error"
+              />
+            </div>
+          )}
+
+          {/* Delivery note */}
           <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 flex items-start gap-3">
             <span className="text-lg shrink-0 mt-0.5">🚚</span>
             <div>
@@ -392,142 +465,108 @@ export default function SellerProductForm() {
             </div>
           </div>
 
-          {/* Product Image */}
+          {/* ── Product Image — URL only ── */}
           <div className="space-y-3">
-            <Label>Product Image *</Label>
-            <div
-              className={`relative border-2 border-dashed rounded-xl transition-smooth ${errors.imageUrl ? "border-destructive" : "border-border"}`}
-            >
-              {previewSrc ? (
-                <div className="p-4 flex items-start gap-4">
-                  <div className="relative shrink-0">
-                    <img
-                      src={previewSrc}
-                      alt="Product preview"
-                      className="w-24 h-24 rounded-xl object-cover bg-muted border border-border"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    {uploadState === "uploading" && (
-                      <div className="absolute inset-0 bg-background/70 rounded-xl flex items-center justify-center">
-                        <Loader2
-                          size={20}
-                          className="text-primary animate-spin"
-                        />
-                      </div>
-                    )}
-                    {uploadState === "done" && (
-                      <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <CheckCircle2 size={12} className="text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-sm font-semibold text-foreground">
-                      {uploadState === "uploading"
-                        ? `Uploading… ${uploadProgress}%`
-                        : uploadState === "done"
-                          ? "Photo uploaded ✓"
-                          : uploadState === "error"
-                            ? "Upload failed — using URL below"
-                            : "Image set"}
-                    </p>
-                    {uploadState === "uploading" && (
-                      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="bg-primary h-full rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                      {previewSrc}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveImage}
-                    data-ocid="seller.product_form.remove_image_button"
-                    className="shrink-0 p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-smooth"
-                    aria-label="Remove image"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  data-ocid="seller.product_form.upload_button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex flex-col items-center justify-center gap-3 py-10 px-6 text-center hover:bg-muted/30 rounded-xl transition-smooth cursor-pointer"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                    <Upload size={24} className="text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-foreground">
-                      Upload Photo
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      JPG, PNG, WEBP up to 10MB
-                    </p>
-                  </div>
-                </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={handleFileSelect}
-                className="sr-only"
-                aria-label="Upload product photo"
-                data-ocid="seller.product_form.file_input"
-              />
+            {/* Section label with imglink.cc link */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Label htmlFor="pf-imageUrl" className="text-sm font-semibold">
+                Product Photo URL *
+              </Label>
+              <a
+                href="https://imglink.cc/"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-ocid="seller.product_form.imglink_link"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+              >
+                <span className="text-muted-foreground">(</span>
+                <ExternalLink size={11} className="text-primary" />
+                https://imglink.cc/
+                <span className="text-muted-foreground">)</span>
+              </a>
             </div>
 
-            {previewSrc && uploadState !== "uploading" && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                data-ocid="seller.product_form.change_photo_button"
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-2 text-xs"
-              >
-                <ImageIcon size={13} />
-                Change Photo
-              </Button>
-            )}
+            {/* Step-by-step guidance box */}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Info size={15} className="text-primary shrink-0" />
+                <p className="text-xs font-bold text-primary uppercase tracking-wide">
+                  How to get your photo URL — Step by step
+                </p>
+              </div>
 
+              <ol className="space-y-2 pl-1">
+                {IMAGE_UPLOAD_STEPS.map((step, stepIdx) => (
+                  <li
+                    key={step.id}
+                    className="flex items-start gap-2.5 text-xs text-foreground/80"
+                  >
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary font-bold text-[10px] flex items-center justify-center mt-0.5">
+                      {stepIdx + 1}
+                    </span>
+                    <span className="leading-relaxed">{step.text}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="text-xs text-destructive font-semibold mt-1.5">
+                ⚠️ Do not paste the page URL — only paste the{" "}
+                <strong>Direct URL</strong> or your photo won't show.
+              </p>
+            </div>
+
+            {/* URL input */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="pf-image-url"
-                className="text-xs text-muted-foreground font-normal"
-              >
-                Or paste an image URL
-              </Label>
               <Input
-                id="pf-image-url"
+                id="pf-imageUrl"
                 data-ocid="seller.product_form.image_url_input"
                 value={form.imageUrl}
                 onChange={(e) => {
                   set("imageUrl", e.target.value);
-                  if (e.target.value.trim()) {
-                    setPreviewSrc(e.target.value.trim());
-                    setUploadState("idle");
-                  } else {
-                    setPreviewSrc("");
-                  }
+                  const url = e.target.value.trim();
+                  setPreviewSrc(url || "");
                 }}
-                placeholder="https://example.com/image.jpg"
-                className={`text-sm ${errors.imageUrl ? "border-destructive" : ""}`}
+                placeholder="https://iili.io/xxxxxxx.jpg  (Direct URL from imglink.cc)"
+                className={errors.imageUrl ? "border-destructive" : ""}
+              />
+              <FieldError
+                message={errors.imageUrl}
+                id="seller.product_form.image_url_input.field_error"
               />
             </div>
-            <FieldError
-              message={errors.imageUrl}
-              id="seller.product_form.image_url_input.field_error"
-            />
+
+            {/* Live preview once URL is entered */}
+            {previewSrc && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border border-border">
+                <img
+                  src={previewSrc}
+                  alt="Product preview"
+                  className="w-20 h-20 rounded-lg object-cover bg-muted border border-border shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "/assets/images/placeholder.svg";
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground">
+                    Preview
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[220px]">
+                    {previewSrc}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewSrc("");
+                      set("imageUrl", "");
+                    }}
+                    className="text-xs text-destructive hover:underline mt-1"
+                    data-ocid="seller.product_form.remove_image_button"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Feature flags */}
@@ -572,11 +611,46 @@ export default function SellerProductForm() {
             </div>
           )}
 
+          {/* Help box */}
+          <div
+            data-ocid="seller.product_form.help_box"
+            className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 space-y-2"
+            style={{ background: "oklch(0.82 0.18 85 / 0.08)" }}
+          >
+            <p className="text-xs font-bold text-amber-400 flex items-center gap-2">
+              <span>🤝</span> Need help adding your product?
+            </p>
+            <p className="text-xs text-foreground/80 leading-relaxed">
+              Share your product photo along with your login details and we'll
+              add it for you:
+            </p>
+            <div className="space-y-1">
+              <p className="text-xs text-foreground/90 font-semibold">
+                📞 Phone:{" "}
+                <a
+                  href="tel:9541784248"
+                  className="text-primary hover:underline"
+                >
+                  9541784248
+                </a>
+              </p>
+              <p className="text-xs text-foreground/90 font-semibold">
+                📧 Email:{" "}
+                <a
+                  href="mailto:atyash9541784248@gmail.com"
+                  className="text-primary hover:underline"
+                >
+                  atyash9541784248@gmail.com
+                </a>
+              </p>
+            </div>
+          </div>
+
           <div className="flex items-center gap-3 pt-2">
             <Button
               type="submit"
               data-ocid="seller.product_form.submit_button"
-              disabled={isPending || uploadState === "uploading"}
+              disabled={isPending}
               className="btn-primary flex-1"
             >
               {isPending

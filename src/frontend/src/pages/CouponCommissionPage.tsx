@@ -1,7 +1,9 @@
 import { useActor } from "@caffeineai/core-infrastructure";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { createActor } from "../backend";
 import type { Coupon } from "../backend.d";
+import { OrderStatus } from "../backend.d";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -23,6 +25,43 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ─── Stat Box ──────────────────────────────────────────────────────────────────
+function StatBox({
+  value,
+  label,
+  accent,
+}: {
+  value: number | string;
+  label: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className="flex-1 rounded-xl px-4 py-4 flex flex-col items-center justify-center text-center"
+      style={{
+        background: accent
+          ? "oklch(0.62 0.28 315 / 0.10)"
+          : "oklch(0.60 0.20 145 / 0.08)",
+        border: accent
+          ? "1px solid oklch(0.62 0.28 315 / 0.35)"
+          : "1px solid oklch(0.60 0.20 145 / 0.30)",
+      }}
+    >
+      <p
+        className="font-display font-black text-3xl leading-none mb-1"
+        style={{
+          color: accent ? "oklch(0.62 0.28 315)" : "oklch(0.72 0.22 145)",
+        }}
+      >
+        {value}
+      </p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-tight">
+        {label}
+      </p>
+    </div>
+  );
+}
+
 // ─── CouponCommissionPage ──────────────────────────────────────────────────────
 export default function CouponCommissionPage() {
   const { actor, isFetching } = useActor(createActor);
@@ -31,6 +70,37 @@ export default function CouponCommissionPage() {
   const [coupon, setCoupon] = useState<Coupon | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkedCode, setCheckedCode] = useState<string | null>(null);
+
+  // Fetch all orders to compute coupon usage stats
+  const { data: allOrders = [] } = useQuery({
+    queryKey: ["coupon-commission-orders", checkedCode],
+    queryFn: async () => {
+      if (!actor || !checkedCode) return [];
+      const pairs = await actor.listOrders();
+      return pairs.map(([, order]) => order);
+    },
+    enabled: !!actor && !isFetching && !!checkedCode,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  // Filter orders by this coupon code
+  const couponOrders = checkedCode
+    ? allOrders.filter(
+        (o) => o.couponCode?.toUpperCase() === checkedCode.toUpperCase(),
+      )
+    : [];
+
+  const successStatuses: OrderStatus[] = [
+    OrderStatus.Delivered,
+    OrderStatus.Accepted,
+    OrderStatus.Confirmed,
+    OrderStatus.Shipped,
+  ];
+
+  const successfulOrders = couponOrders.filter((o) =>
+    successStatuses.includes(o.status),
+  );
 
   async function handleCheck(e: React.FormEvent) {
     e.preventDefault();
@@ -39,10 +109,12 @@ export default function CouponCommissionPage() {
     setNotFound(false);
     setCoupon(null);
     setError(null);
+    setCheckedCode(null);
     try {
       const result = await actor.getCoupon(code.trim().toUpperCase());
       if (result) {
         setCoupon(result);
+        setCheckedCode(code.trim().toUpperCase());
       } else {
         setNotFound(true);
       }
@@ -251,25 +323,49 @@ export default function CouponCommissionPage() {
                 )}
               </div>
 
-              {/* Usage stats placeholder */}
-              <div
-                className="mx-5 mb-5 mt-3 rounded-xl px-4 py-4"
-                style={{
-                  background: "oklch(0.75 0.20 85 / 0.07)",
-                  border: "1px solid oklch(0.75 0.20 85 / 0.25)",
-                }}
-              >
+              {/* ─── Usage Stats ─────────────────────────────────── */}
+              <div className="px-5 pb-5 pt-4">
                 <p
-                  className="text-[10px] font-black uppercase tracking-widest mb-1.5"
+                  className="text-[10px] font-black uppercase tracking-widest mb-3"
                   style={{ color: "oklch(0.75 0.20 85)" }}
                 >
                   Usage Statistics
                 </p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Usage stats are being tracked. Contact TBah admin at{" "}
-                  <span className="font-bold text-foreground">/admin</span> to
-                  view detailed coupon usage and calculate your commission.
-                </p>
+                <div className="flex gap-3 mb-4">
+                  <StatBox value={couponOrders.length} label="Total Orders" />
+                  <StatBox
+                    value={successfulOrders.length}
+                    label="Successful Orders"
+                    accent
+                  />
+                </div>
+
+                {/* Successful orders breakdown */}
+                <div
+                  className="rounded-xl px-4 py-3 flex items-center justify-between"
+                  style={{
+                    background: "oklch(0.60 0.20 145 / 0.08)",
+                    border: "1px solid oklch(0.60 0.20 145 / 0.25)",
+                  }}
+                >
+                  <div>
+                    <p
+                      className="text-xs font-black"
+                      style={{ color: "oklch(0.72 0.22 145)" }}
+                    >
+                      Successful orders through your code
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Accepted, Confirmed, Shipped or Delivered
+                    </p>
+                  </div>
+                  <p
+                    className="font-display font-black text-4xl ml-4"
+                    style={{ color: "oklch(0.72 0.22 145)" }}
+                  >
+                    {successfulOrders.length}
+                  </p>
+                </div>
               </div>
 
               {/* Commission note */}
@@ -293,8 +389,8 @@ export default function CouponCommissionPage() {
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Commission earnings are calculated and paid out by TBah admin
-                  based on verified usage. Contact admin for your payout
-                  details.
+                  based on verified successful orders. Contact admin for your
+                  payout details.
                 </p>
               </div>
             </div>

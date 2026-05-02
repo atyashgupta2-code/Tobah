@@ -41,7 +41,7 @@ module {
     orders.values().filter(func(o : Types.Order) : Bool { o.customerId == phone }).toArray();
   };
 
-  /// Returns all orders that contain at least one product from the given seller.
+  /// Returns all orders that contain at least one product from the given seller, sorted by createdAt descending.
   public func listOrdersBySeller(
     orders : Map.Map<Types.OrderId, Types.Order>,
     products : Map.Map<Types.ProductId, Types.Product>,
@@ -54,7 +54,11 @@ module {
           case null { false };
         };
       }) != null
-    }).toArray();
+    }).toArray().sort(func(a : Types.Order, b : Types.Order) : { #less; #equal; #greater } {
+      if (a.createdAt > b.createdAt) { #less }
+      else if (a.createdAt < b.createdAt) { #greater }
+      else { #equal }
+    });
   };
 
   /// Registers a seller, deduplicating by email OR phone.
@@ -159,11 +163,13 @@ module {
           hasFitAndTry = true;
           stock = 50;
           gender = "Unisex";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -181,11 +187,13 @@ module {
           hasFitAndTry = true;
           stock = 30;
           gender = "Men";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -203,11 +211,13 @@ module {
           hasFitAndTry = true;
           stock = 25;
           gender = "Women";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -225,11 +235,13 @@ module {
           hasFitAndTry = false;
           stock = 100;
           gender = "Unisex";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -247,11 +259,13 @@ module {
           hasFitAndTry = true;
           stock = 20;
           gender = "Women";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -269,11 +283,13 @@ module {
           hasFitAndTry = true;
           stock = 15;
           gender = "Unisex";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -291,11 +307,13 @@ module {
           hasFitAndTry = true;
           stock = 40;
           gender = "Women";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -313,11 +331,13 @@ module {
           hasFitAndTry = false;
           stock = 60;
           gender = "Men";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -335,11 +355,13 @@ module {
           hasFitAndTry = false;
           stock = 10;
           gender = "Handicrafts";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -357,11 +379,13 @@ module {
           hasFitAndTry = false;
           stock = 35;
           gender = "Other";
+          subcategory = null;
           sellerId = "admin";
           sellerName = "TBah";
           orderCount = 0;
           fulfillmentBy = #AdminFulfilled;
           isTrending = false;
+          isNewArrival = false;
           createdAt = baseTs;
         },
       ),
@@ -402,11 +426,13 @@ module {
       hasFitAndTry = input.hasFitAndTry;
       stock = input.stock;
       gender = input.gender;
+      subcategory = input.subcategory;
       sellerId = input.sellerId;
       sellerName = input.sellerName;
       orderCount = 0;
       fulfillmentBy = input.fulfillmentBy;
       isTrending = input.isTrending;
+      isNewArrival = false; // new products are NOT auto-marked as new arrival
       createdAt = Time.now();
     };
     products.add(id, product);
@@ -433,6 +459,7 @@ module {
           hasFitAndTry = input.hasFitAndTry;
           stock = input.stock;
           gender = input.gender;
+          subcategory = input.subcategory;
           sellerId = input.sellerId;
           sellerName = input.sellerName;
           fulfillmentBy = input.fulfillmentBy;
@@ -473,15 +500,25 @@ module {
     };
   };
 
-  /// Returns the 8 most recently added active products (sorted by createdAt descending).
+  /// Returns all products where isNewArrival == true (admin-controlled).
   public func getNewArrivals(products : Map.Map<Types.ProductId, Types.Product>) : [Types.Product] {
-    let sorted = products.values().toArray().sort(func(a : Types.Product, b : Types.Product) : { #less; #equal; #greater } {
-      if (a.createdAt > b.createdAt) { #less }
-      else if (a.createdAt < b.createdAt) { #greater }
-      else { #equal }
-    });
-    if (sorted.size() <= 8) { sorted }
-    else { sorted.sliceToArray(0, 8) };
+    products.values().filter(func(p : Types.Product) : Bool { p.isNewArrival }).toArray();
+  };
+
+  /// Admin sets or unsets a product as a New Arrival.
+  public func setNewArrival(
+    products : Map.Map<Types.ProductId, Types.Product>,
+    id : Types.ProductId,
+    isNewArrival : Bool,
+  ) : { #ok : Types.Product; #err : Text } {
+    switch (products.get(id)) {
+      case null { #err("Product not found") };
+      case (?existing) {
+        let updated : Types.Product = { existing with isNewArrival = isNewArrival };
+        products.add(id, updated);
+        #ok(updated);
+      };
+    };
   };
 
   // ─── Coupon Helpers ────────────────────────────────────────────────────────
@@ -775,7 +812,11 @@ module {
   };
 
   public func listOrders(orders : Map.Map<Types.OrderId, Types.Order>) : [(Types.OrderId, Types.Order)] {
-    orders.entries().toArray();
+    orders.entries().toArray().sort(func(a : (Types.OrderId, Types.Order), b : (Types.OrderId, Types.Order)) : { #less; #equal; #greater } {
+      if (a.1.createdAt > b.1.createdAt) { #less }
+      else if (a.1.createdAt < b.1.createdAt) { #greater }
+      else { #equal }
+    });
   };
 
   public func updateOrderStatus(
@@ -864,6 +905,51 @@ module {
           };
         };
       };
+    };
+  };
+
+  // ─── Coupon Order Stats ────────────────────────────────────────────────────
+
+  /// Returns order counts for a given coupon code.
+  /// totalOrders = all orders where couponCode matches (case-insensitive).
+  /// successfulOrders = orders with status #Placed, #Confirmed, #Processing,
+  ///                    #Shipped, #Delivered, #Accepted, or #Completed
+  ///                    (i.e. not #Cancelled, #Rejected, or #Pending).
+  public func getCouponOrderStats(
+    orders : Map.Map<Types.OrderId, Types.Order>,
+    code : Text,
+  ) : ?{ couponCode : Text; totalOrders : Nat; successfulOrders : Nat } {
+    let upperCode = code.toUpper();
+    var total : Nat = 0;
+    var successful : Nat = 0;
+    for ((_, order) in orders.entries()) {
+      switch (order.couponCode) {
+        case null {};
+        case (?oc) {
+          if (oc.toUpper() == upperCode) {
+            total += 1;
+            let isSuccessful = switch (order.status) {
+              case (#Placed)      { true };
+              case (#Confirmed)   { true };
+              case (#Processing)  { true };
+              case (#Shipped)     { true };
+              case (#Delivered)   { true };
+              case (#Accepted)    { true };
+              case (#Cancelled)   { false };
+              case (#Rejected)    { false };
+              case (#Pending)     { false };
+            };
+            if (isSuccessful) { successful += 1 };
+          };
+        };
+      };
+    };
+    // Only return a result if the code was actually referenced (even 0 orders),
+    // but we need at least evidence the code exists OR total > 0.
+    // Return null only if code is empty.
+    if (upperCode == "") { null }
+    else {
+      ?{ couponCode = upperCode; totalOrders = total; successfulOrders = successful }
     };
   };
 

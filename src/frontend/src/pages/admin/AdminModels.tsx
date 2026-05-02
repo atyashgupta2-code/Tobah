@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ImagePlus, Link2, Trash2 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, ImagePlus, Link2, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -160,6 +161,7 @@ const SKEL_KEYS = ["sk-a", "sk-b", "sk-c"] as const;
 
 // ─── Admin Models Page ─────────────────────────────────────────────────────────
 export default function AdminModels() {
+  const navigate = useNavigate();
   const { data: photos = [], isLoading } = useListModelPhotos();
   const { data: products = [] } = useProducts();
   const addPhoto = useAddModelPhoto();
@@ -216,6 +218,16 @@ export default function AdminModels() {
         style={{ background: "oklch(0.18 0.02 280)" }}
       >
         <div className="max-w-screen-sm mx-auto flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            data-ocid="admin.models.back_button"
+            onClick={() => navigate({ to: "/admin" })}
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Back to dashboard"
+          >
+            <ArrowLeft size={18} />
+          </Button>
           <div>
             <h1 className="font-display font-black text-2xl text-foreground leading-tight">
               Model Gallery

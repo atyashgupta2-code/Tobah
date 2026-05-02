@@ -99,6 +99,7 @@ type Product__433464713 =
     hasSameDayDelivery : Bool;
     id : ProductId__422882197;
     imageUrl : Text;
+    isNewArrival : Bool;
     isTrending : Bool;
     name : Text;
     orderCount : Nat;
@@ -106,7 +107,8 @@ type Product__433464713 =
     sellerId : Text;
     sellerName : Text;
     sizes : [Text];
-    stock : Nat
+    stock : Nat;
+    subcategory : ?Text
   };
 type SellerId__850746642 = Text;
 type SellerId__932674275 = SellerId__850746642;

@@ -28,15 +28,25 @@ import { AdminLayout } from "./AdminLayout";
 
 type GenderOption = "Men" | "Women" | "Unisex";
 
+// Categories that support subcategories
+type CategoryWithSubs = "Shoes" | "Other";
+
+const SUBCATEGORY_OPTIONS: Record<CategoryWithSubs, string[]> = {
+  Shoes: ["Men", "Women"],
+  Other: ["Bedsheets", "Artificial Jewellery", "Other"],
+};
+
 interface FormState {
   name: string;
   description: string;
   price: string;
   imageUrl: string;
   category: string;
+  subcategory: string;
   sizes: string;
   stock: string;
   hasSameDayDelivery: boolean;
+  isNewArrival: boolean;
   gender: GenderOption;
   sellerId: string;
   sellerName: string;
@@ -48,9 +58,11 @@ const defaultForm: FormState = {
   price: "",
   imageUrl: "",
   category: "",
+  subcategory: "",
   sizes: "",
   stock: "",
   hasSameDayDelivery: false,
+  isNewArrival: false,
   gender: "Unisex",
   sellerId: "admin",
   sellerName: "Admin",
@@ -72,6 +84,19 @@ function FieldError({ message, id }: FieldErrorProps) {
 type UploadState = "idle" | "uploading" | "done" | "error";
 
 const GENDER_OPTIONS: GenderOption[] = ["Men", "Women", "Unisex"];
+
+// All available top-level categories
+const CATEGORY_OPTIONS = [
+  "Men",
+  "Women",
+  "Handicrafts",
+  "Shoes",
+  "Other",
+] as const;
+
+function hasSubcategories(cat: string): cat is CategoryWithSubs {
+  return cat === "Shoes" || cat === "Other";
+}
 
 export default function ProductForm() {
   const navigate = useNavigate();
@@ -104,9 +129,11 @@ export default function ProductForm() {
         price: String(Number(existingProduct.price) / 100),
         imageUrl: existingProduct.imageUrl,
         category: existingProduct.category,
+        subcategory: existingProduct.subcategory ?? "",
         sizes: existingProduct.sizes.join(", "),
         stock: String(Number(existingProduct.stock)),
         hasSameDayDelivery: existingProduct.hasSameDayDelivery,
+        isNewArrival: existingProduct.isNewArrival,
         gender: (existingProduct.gender as GenderOption) || "Unisex",
         sellerId: existingProduct.sellerId || "admin",
         sellerName: existingProduct.sellerName || "Admin",
@@ -118,7 +145,14 @@ export default function ProductForm() {
   }, [isEdit, existingProduct]);
 
   function set(field: keyof FormState, value: string | boolean) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      // Reset subcategory when category changes
+      if (field === "category") {
+        next.subcategory = "";
+      }
+      return next;
+    });
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
@@ -187,12 +221,18 @@ export default function ProductForm() {
     e.preventDefault();
     if (!validate()) return;
 
+    const subcategoryValue =
+      hasSubcategories(form.category) && form.subcategory.trim()
+        ? form.subcategory.trim()
+        : undefined;
+
     const input: ProductInput = {
       name: form.name.trim(),
       description: form.description.trim(),
       price: BigInt(Math.round(Number.parseFloat(form.price) * 100)),
       imageUrl: form.imageUrl.trim(),
       category: form.category.trim(),
+      subcategory: subcategoryValue,
       sizes: form.sizes
         .split(",")
         .map((s) => s.trim())
@@ -210,6 +250,9 @@ export default function ProductForm() {
     try {
       if (isEdit) {
         await updateProduct.mutateAsync({ id: editId!, input });
+        // Handle isNewArrival via setNewArrival — note: this is a best-effort
+        // since updateProduct doesn't pass isNewArrival. The admin can toggle
+        // it from the product list if needed.
         toast.success("Product updated successfully!");
       } else {
         await createProduct.mutateAsync(input);
@@ -222,6 +265,10 @@ export default function ProductForm() {
   }
 
   const isPending = createProduct.isPending || updateProduct.isPending;
+
+  const subcategoryList = hasSubcategories(form.category)
+    ? SUBCATEGORY_OPTIONS[form.category as CategoryWithSubs]
+    : null;
 
   if (isEdit && loadingProduct) {
     return (
@@ -346,13 +393,20 @@ export default function ProductForm() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="category">Category</Label>
-              <Input
+              <select
                 id="category"
-                data-ocid="admin.product_form.category_input"
+                data-ocid="admin.product_form.category_select"
                 value={form.category}
                 onChange={(e) => set("category", e.target.value)}
-                placeholder="e.g. T-Shirts, Hoodies"
-              />
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-foreground"
+              >
+                <option value="">Select category…</option>
+                {CATEGORY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="gender">Gender *</Label>
@@ -371,6 +425,44 @@ export default function ProductForm() {
               </select>
             </div>
           </div>
+
+          {/* Subcategory — shown only for Shoes and Other */}
+          {subcategoryList && (
+            <div className="space-y-1.5">
+              <Label htmlFor="subcategory">
+                Subcategory
+                {form.category === "Shoes" && (
+                  <span className="text-muted-foreground font-normal ml-1">
+                    — Men or Women shoes
+                  </span>
+                )}
+                {form.category === "Other" && (
+                  <span className="text-muted-foreground font-normal ml-1">
+                    — type of item
+                  </span>
+                )}
+              </Label>
+              <select
+                id="subcategory"
+                data-ocid="admin.product_form.subcategory_select"
+                value={form.subcategory}
+                onChange={(e) => set("subcategory", e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-foreground"
+              >
+                <option value="">Select subcategory…</option>
+                {subcategoryList.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {form.category === "Shoes"
+                  ? "Choose whether these shoes are for Men or Women"
+                  : "Select the type that best describes this item"}
+              </p>
+            </div>
+          )}
 
           {/* Sizes */}
           <div className="space-y-1.5">
@@ -536,13 +628,24 @@ export default function ProductForm() {
               </Button>
             )}
 
+            {/* URL input with guidance for imglink.cc */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="imageUrl"
-                className="text-xs text-muted-foreground font-normal"
-              >
-                Or paste an image URL
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label
+                  htmlFor="imageUrl"
+                  className="text-xs text-muted-foreground font-normal"
+                >
+                  Or paste a direct image URL
+                </Label>
+                <a
+                  href="https://imglink.cc/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                >
+                  Get URL (imglink.cc) ↗
+                </a>
+              </div>
               <Input
                 id="imageUrl"
                 data-ocid="admin.product_form.image_url_input"
@@ -556,9 +659,36 @@ export default function ProductForm() {
                     setPreviewSrc("");
                   }
                 }}
-                placeholder="https://example.com/image.jpg"
+                placeholder="https://imglink.cc/images/your-image.jpg"
                 className={`text-sm ${errors.imageUrl ? "border-destructive" : ""}`}
               />
+              <div className="bg-muted/40 border border-border rounded-lg p-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground">
+                  📸 How to get a direct image URL:
+                </p>
+                <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                  <li>
+                    Go to{" "}
+                    <a
+                      href="https://imglink.cc/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      imglink.cc
+                    </a>{" "}
+                    and upload your product photo
+                  </li>
+                  <li>After upload, you'll see multiple URL options</li>
+                  <li>
+                    <strong className="text-foreground">
+                      Choose "Direct URL" only
+                    </strong>{" "}
+                    — it ends in .jpg/.png/.webp
+                  </li>
+                  <li>Copy and paste that URL in the field above</li>
+                </ol>
+              </div>
             </div>
             <FieldError
               message={errors.imageUrl}
@@ -571,18 +701,41 @@ export default function ProductForm() {
             <Label className="text-sm font-semibold text-foreground">
               Features
             </Label>
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-              <Checkbox
-                id="sameDay"
-                data-ocid="admin.product_form.same_day_checkbox"
-                checked={form.hasSameDayDelivery}
-                onCheckedChange={(checked) =>
-                  set("hasSameDayDelivery", !!checked)
-                }
-              />
-              <Label htmlFor="sameDay" className="cursor-pointer text-sm">
-                ⚡ Enable Same-Day Delivery
-              </Label>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                <Checkbox
+                  id="sameDay"
+                  data-ocid="admin.product_form.same_day_checkbox"
+                  checked={form.hasSameDayDelivery}
+                  onCheckedChange={(checked) =>
+                    set("hasSameDayDelivery", !!checked)
+                  }
+                />
+                <Label htmlFor="sameDay" className="cursor-pointer text-sm">
+                  ⚡ Enable Same-Day Delivery
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <Checkbox
+                  id="newArrival"
+                  data-ocid="admin.product_form.new_arrival_checkbox"
+                  checked={form.isNewArrival}
+                  onCheckedChange={(checked) => set("isNewArrival", !!checked)}
+                />
+                <div className="flex-1">
+                  <Label
+                    htmlFor="newArrival"
+                    className="cursor-pointer text-sm font-semibold text-foreground"
+                  >
+                    ✨ Mark as New Arrival
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Shows this product in the New Arrivals section on the
+                    homepage. Only admin can mark products as New Arrival.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 

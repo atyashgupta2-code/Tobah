@@ -3,6 +3,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import {
   Grid3X3,
   Home,
+  Mail,
   Menu,
   Package,
   ShoppingBag,
@@ -256,7 +257,28 @@ export function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 bg-background pb-20 md:pb-0">{children}</main>
+      <main className="flex-1 bg-background pb-24 md:pb-0">{children}</main>
+
+      {/* Mobile contact strip — visible above bottom nav, only on non-admin pages */}
+      <div
+        className="md:hidden fixed bottom-16 left-0 right-0 z-40 flex items-center justify-center gap-2 py-1.5 px-4"
+        style={{
+          background: "oklch(0.14 0.02 280 / 0.96)",
+          borderTop: "1px solid oklch(0.28 0.015 280 / 0.5)",
+        }}
+      >
+        <Mail size={11} className="text-primary shrink-0" />
+        <p className="text-[10px] text-muted-foreground">
+          Get help:{" "}
+          <a
+            href="mailto:atyashgupta2@gmail.com"
+            className="text-primary hover:underline font-semibold"
+            data-ocid="footer.contact_email_link"
+          >
+            atyashgupta2@gmail.com
+          </a>
+        </p>
+      </div>
 
       {/* Bottom mobile nav — thumb-accessible, uses will-change + transform to prevent layout shifts */}
       <nav
@@ -331,7 +353,7 @@ export function Layout({ children }: LayoutProps) {
                 caffeine.ai
               </a>
             </p>
-            <div className="flex gap-4 text-xs text-muted-foreground items-center">
+            <div className="flex flex-col sm:flex-row gap-3 text-xs text-muted-foreground items-center">
               <span className="flex items-center gap-1">
                 ⚡ Same Day Delivery
               </span>
@@ -346,7 +368,26 @@ export function Layout({ children }: LayoutProps) {
                 <Store size={11} />
                 Sell on TBah
               </Link>
+              <a
+                href="mailto:atyashgupta2@gmail.com"
+                data-ocid="footer.contact_email_link"
+                className="flex items-center gap-1.5 text-primary hover:text-primary/80 transition-smooth"
+              >
+                <Mail size={11} />
+                Get Help
+              </a>
             </div>
+          </div>
+          {/* Contact row */}
+          <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Mail size={12} className="text-primary" />
+            <span>Need help?</span>
+            <a
+              href="mailto:atyashgupta2@gmail.com"
+              className="text-primary hover:underline font-semibold"
+            >
+              atyashgupta2@gmail.com
+            </a>
           </div>
         </div>
       </footer>

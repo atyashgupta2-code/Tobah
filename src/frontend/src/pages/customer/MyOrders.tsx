@@ -193,11 +193,14 @@ function CancelModal({
   );
 }
 
+const INITIAL_VISIBLE = 5;
+
 export default function MyOrders() {
   const { currentCustomer, logout, isLoggedIn } = useCustomer();
   const navigate = useNavigate();
   const cancelMutation = useCancelOrder();
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -222,6 +225,11 @@ export default function MyOrders() {
   const sortedOrders = orders
     ? [...orders].sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
     : [];
+
+  const visibleOrders = showAll
+    ? sortedOrders
+    : sortedOrders.slice(0, INITIAL_VISIBLE);
+  const hasMore = sortedOrders.length > INITIAL_VISIBLE;
 
   return (
     <>
@@ -298,7 +306,7 @@ export default function MyOrders() {
 
         {/* Order cards */}
         {!isLoading &&
-          sortedOrders.map((order, idx) => {
+          visibleOrders.map((order, idx) => {
             const localCancelled = isOrderCancelled(order.id);
             const cancelled =
               localCancelled || order.status === OrderStatus.Cancelled;
@@ -401,6 +409,22 @@ export default function MyOrders() {
               </div>
             );
           })}
+
+        {/* Show More / Show Less */}
+        {!isLoading && hasMore && (
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              data-ocid="my_orders.show_more_button"
+              onClick={() => setShowAll((prev) => !prev)}
+              className="px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest border-2 border-primary/40 text-primary hover:bg-primary/10 transition-smooth active:scale-[0.97]"
+            >
+              {showAll
+                ? "Show Less"
+                : `Show More Orders (${sortedOrders.length - INITIAL_VISIBLE} more)`}
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   Bell,
   Check,
   Package,
@@ -782,6 +783,7 @@ function CouponManagement() {
 type Tab = "products" | "sellers" | "coupons";
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("products");
   const { data: products, isLoading, isError } = useProducts();
   const { data: orders } = useListOrders();
@@ -807,13 +809,26 @@ export default function AdminDashboard() {
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display font-black text-2xl text-foreground">
-              Dashboard
-            </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              Manage your TBah inventory &amp; sellers
-            </p>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              data-ocid="admin.dashboard.back_button"
+              onClick={() => navigate({ to: "/" })}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label="Back to store"
+              title="Back to TBah store"
+            >
+              <ArrowLeft size={18} />
+            </Button>
+            <div>
+              <h1 className="font-display font-black text-2xl text-foreground">
+                Dashboard
+              </h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                Manage your TBah inventory &amp; sellers
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <NotificationsBell />

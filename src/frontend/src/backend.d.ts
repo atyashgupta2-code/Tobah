@@ -22,6 +22,7 @@ export interface SellerEarnings {
 export type Timestamp = bigint;
 export interface ProductInput {
     fulfillmentBy: FulfillmentBy;
+    subcategory?: string;
     name: string;
     description: string;
     hasFitAndTry: boolean;
@@ -127,8 +128,10 @@ export interface CartItem {
 export interface Product {
     id: ProductId;
     fulfillmentBy: FulfillmentBy;
+    subcategory?: string;
     name: string;
     createdAt: bigint;
+    isNewArrival: boolean;
     description: string;
     hasFitAndTry: boolean;
     sizes: Array<string>;
@@ -229,6 +232,11 @@ export interface backendInterface {
     }>;
     getAllNotifications(): Promise<Array<Notification>>;
     getCoupon(code: string): Promise<Coupon | null>;
+    getCouponOrderStats(code: string): Promise<{
+        couponCode: string;
+        totalOrders: bigint;
+        successfulOrders: bigint;
+    } | null>;
     getCustomer(phone: string): Promise<Customer | null>;
     getNewArrivals(): Promise<Array<Product>>;
     getNotifications(sellerId: string | null): Promise<Array<Notification>>;
@@ -262,6 +270,13 @@ export interface backendInterface {
         err: string;
     }>;
     removeSeller(sellerId: SellerId): Promise<boolean>;
+    setNewArrival(productId: ProductId, isNewArrival: boolean): Promise<{
+        __kind__: "ok";
+        ok: Product;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     setProductTrending(productId: ProductId, trending: boolean): Promise<{
         __kind__: "ok";
         ok: Product;

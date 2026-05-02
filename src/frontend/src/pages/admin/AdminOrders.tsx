@@ -9,7 +9,9 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   Bell,
   CheckCheck,
   ChevronDown,
@@ -26,6 +28,7 @@ import { FulfillmentBy, OrderStatus } from "../../backend.d";
 import {
   useGetAllAdminNotifications,
   useListOrders,
+  useListSellers,
   useMarkAdminNotificationRead,
   useUpdateOrderStatus,
 } from "../../hooks/useAdminProducts";
@@ -255,6 +258,9 @@ function OrderCard({
   productOrderCounts,
   productNames,
   productSellerNames,
+  productSellerPhones,
+  productImages,
+  productPrices,
 }: {
   orderId: OrderId;
   order: Order;
@@ -262,6 +268,9 @@ function OrderCard({
   productOrderCounts: Record<string, number>;
   productNames: Record<string, string>;
   productSellerNames: Record<string, string>;
+  productSellerPhones: Record<string, string>;
+  productImages: Record<string, string>;
+  productPrices: Record<string, number>;
 }) {
   const updateStatus = useUpdateOrderStatus();
   const [expanded, setExpanded] = useState(false);
@@ -270,11 +279,18 @@ function OrderCard({
     STATUS_CONFIG[order.status] ?? STATUS_CONFIG[OrderStatus.Pending];
   const shortId = orderId.slice(0, 8).toUpperCase();
 
-  // Collect unique seller names from this order's items
+  // Collect unique seller names + phones from this order's items
   const sellerNames = Array.from(
     new Set(
       order.items
         .map((item) => productSellerNames[item.productId])
+        .filter(Boolean),
+    ),
+  );
+  const sellerPhones = Array.from(
+    new Set(
+      order.items
+        .map((item) => productSellerPhones[item.productId])
         .filter(Boolean),
     ),
   );
@@ -346,6 +362,14 @@ function OrderCard({
                   {name}
                 </span>
               ))}
+              {sellerPhones.map((ph) => (
+                <span
+                  key={ph}
+                  className="text-[11px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md"
+                >
+                  {ph}
+                </span>
+              ))}
             </div>
           )}
           <p className="text-xs text-muted-foreground">
@@ -357,7 +381,7 @@ function OrderCard({
         <div className="flex items-center gap-3">
           <div>
             <p className="font-mono font-black text-lg text-foreground">
-              ₹{Number(order.total).toLocaleString()}
+              {`\u20b9${(Number(order.total) / 100).toLocaleString()}`}
             </p>
             <p className="text-xs text-muted-foreground">
               {order.items.length} {order.items.length === 1 ? "item" : "items"}
@@ -443,7 +467,7 @@ function OrderCard({
             </div>
           </div>
 
-          {/* Products ordered with order counts */}
+          {/* Products ordered with product photos, name, qty, unit price */}
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
               Items Ordered
@@ -452,48 +476,83 @@ function OrderCard({
               {order.items.map((item, i) => {
                 const name = productNames[item.productId];
                 const orderCount = productOrderCounts[item.productId] ?? 0;
+                const imgSrc = productImages[item.productId];
+                const unitPrice = productPrices[item.productId];
+                const qty = Number(item.quantity);
+                const lineTotal =
+                  unitPrice != null ? unitPrice * qty : undefined;
                 return (
                   <div
                     key={`${item.productId}-${item.selectedSize}-${i}`}
                     className="bg-card rounded-xl border border-border p-3 flex items-start gap-3"
                     data-ocid={`admin.orders.order_item.${index}.${i + 1}`}
                   >
-                    <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0 border border-border">
-                      <ShoppingBag
-                        size={16}
-                        className="text-muted-foreground"
-                      />
+                    {/* Product thumbnail */}
+                    <div className="w-14 h-14 rounded-xl bg-muted shrink-0 border border-border overflow-hidden">
+                      {imgSrc ? (
+                        <img
+                          src={imgSrc}
+                          alt={name ?? "Product"}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display =
+                              "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ShoppingBag
+                            size={18}
+                            className="text-muted-foreground"
+                          />
+                        </div>
+                      )}
                     </div>
+
                     <div className="flex-1 min-w-0">
+                      {/* Product name */}
                       {name ? (
-                        <p className="text-sm font-bold text-foreground truncate">
+                        <p className="text-sm font-bold text-foreground leading-snug">
                           {name}
                         </p>
                       ) : (
-                        <p className="text-sm font-semibold text-foreground truncate">
-                          Product:{" "}
+                        <p className="text-sm font-semibold text-muted-foreground">
+                          ID:{" "}
                           <span className="font-mono text-primary text-xs">
-                            {item.productId}
+                            {item.productId.slice(0, 10)}…
                           </span>
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-xs text-muted-foreground">
-                          Size:{" "}
-                          <span className="font-bold text-foreground">
-                            {item.selectedSize}
+
+                      {/* Size + Qty row */}
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        {item.selectedSize && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-muted/60 border border-border px-2 py-0.5 rounded-md font-semibold text-foreground">
+                            Size: {item.selectedSize}
                           </span>
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Qty:{" "}
-                          <span className="font-bold text-foreground">
-                            {Number(item.quantity)}
-                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 text-xs bg-muted/60 border border-border px-2 py-0.5 rounded-md font-semibold text-foreground">
+                          Qty: {qty}
                         </span>
                         {orderCount > 0 && (
                           <span className="flex items-center gap-0.5 text-xs font-bold text-amber-400">
                             <Flame size={11} className="text-amber-400" />
-                            {orderCount.toLocaleString()} total orders
+                            {orderCount.toLocaleString()} sold
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Price row */}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {unitPrice != null && (
+                          <span className="text-xs text-muted-foreground">
+                            ₹{unitPrice.toLocaleString()} × {qty}
+                          </span>
+                        )}
+                        {lineTotal != null && (
+                          <span className="ml-auto font-mono font-black text-sm text-foreground">
+                            ₹{lineTotal.toLocaleString()}
                           </span>
                         )}
                       </div>
@@ -529,7 +588,7 @@ function OrderCard({
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Order Total</p>
               <p className="font-mono font-black text-xl text-foreground">
-                ₹{Number(order.total).toLocaleString()}
+                {`\u20b9${(Number(order.total) / 100).toLocaleString()}`}
               </p>
             </div>
           </div>
@@ -540,6 +599,7 @@ function OrderCard({
 }
 
 export default function AdminOrders() {
+  const navigate = useNavigate();
   const { data: orders, isLoading, isError, refetch } = useListOrders();
   const { data: products = [] } = useProducts();
   const { data: allNotifications = [] } = useGetAllAdminNotifications();
@@ -570,8 +630,43 @@ export default function AdminOrders() {
     return map;
   }, [products]);
 
+  const { data: sellers = [] } = useListSellers();
+  const sellerIdToPhone = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const s of sellers) {
+      if (s.phone) map[s.id] = s.phone;
+    }
+    return map;
+  }, [sellers]);
+
+  const productSellerPhones = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const p of products) {
+      const phone = sellerIdToPhone[p.sellerId];
+      if (phone) map[p.id] = phone;
+    }
+    return map;
+  }, [products, sellerIdToPhone]);
+
+  const productImages = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const p of products) {
+      if (p.imageUrl) map[p.id] = p.imageUrl;
+    }
+    return map;
+  }, [products]);
+
+  // Unit price in ₹ (backend stores as paise×100, divide by 100)
+  const productPrices = useMemo<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const p of products) {
+      map[p.id] = Number(p.price) / 100;
+    }
+    return map;
+  }, [products]);
+
   const totalRevenue =
-    orders?.reduce((sum, [, o]) => sum + Number(o.total), 0) ?? 0;
+    orders?.reduce((sum, [, o]) => sum + Number(o.total) / 100, 0) ?? 0;
   const pendingCount =
     orders?.filter(([, o]) => o.status === OrderStatus.Pending).length ?? 0;
   const deliveredCount =
@@ -587,14 +682,26 @@ export default function AdminOrders() {
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display font-black text-2xl text-foreground">
-              Orders
-            </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              Click any order to see full customer info and product order
-              history
-            </p>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              data-ocid="admin.orders.back_button"
+              onClick={() => navigate({ to: "/admin" })}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label="Back to dashboard"
+            >
+              <ArrowLeft size={18} />
+            </Button>
+            <div>
+              <h1 className="font-display font-black text-2xl text-foreground">
+                Orders
+              </h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                Click any order to see full customer info and product order
+                history
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Admin supplier action notifications */}
@@ -719,6 +826,9 @@ export default function AdminOrders() {
                 productOrderCounts={productOrderCounts}
                 productNames={productNames}
                 productSellerNames={productSellerNames}
+                productSellerPhones={productSellerPhones}
+                productImages={productImages}
+                productPrices={productPrices}
               />
             ))}
           </div>

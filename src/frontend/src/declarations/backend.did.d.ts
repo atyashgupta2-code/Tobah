@@ -100,8 +100,10 @@ export type PaymentMethod = { 'Card' : null } |
 export interface Product {
   'id' : ProductId,
   'fulfillmentBy' : FulfillmentBy,
+  'subcategory' : [] | [string],
   'name' : string,
   'createdAt' : bigint,
+  'isNewArrival' : boolean,
   'description' : string,
   'hasFitAndTry' : boolean,
   'sizes' : Array<string>,
@@ -125,6 +127,7 @@ export interface ProductEarningBreakdown {
 export type ProductId = string;
 export interface ProductInput {
   'fulfillmentBy' : FulfillmentBy,
+  'subcategory' : [] | [string],
   'name' : string,
   'description' : string,
   'hasFitAndTry' : boolean,
@@ -219,6 +222,16 @@ export interface _SERVICE {
   >,
   'getAllNotifications' : ActorMethod<[], Array<Notification>>,
   'getCoupon' : ActorMethod<[string], [] | [Coupon]>,
+  'getCouponOrderStats' : ActorMethod<
+    [string],
+    [] | [
+      {
+        'couponCode' : string,
+        'totalOrders' : bigint,
+        'successfulOrders' : bigint,
+      }
+    ]
+  >,
   'getCustomer' : ActorMethod<[string], [] | [Customer]>,
   'getNewArrivals' : ActorMethod<[], Array<Product>>,
   'getNotifications' : ActorMethod<[[] | [string]], Array<Notification>>,
@@ -248,6 +261,11 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'removeSeller' : ActorMethod<[SellerId], boolean>,
+  'setNewArrival' : ActorMethod<
+    [ProductId, boolean],
+    { 'ok' : Product } |
+      { 'err' : string }
+  >,
   'setProductTrending' : ActorMethod<
     [ProductId, boolean],
     { 'ok' : Product } |

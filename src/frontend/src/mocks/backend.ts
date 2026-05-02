@@ -21,6 +21,7 @@ const sampleProducts: Product[] = [
     orderCount: BigInt(12),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
     isTrending: true,
+    isNewArrival: false,
     createdAt: NOW,
   },
   {
@@ -40,6 +41,7 @@ const sampleProducts: Product[] = [
     orderCount: BigInt(7),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
     isTrending: false,
+    isNewArrival: false,
     createdAt: NOW,
   },
   {
@@ -59,6 +61,7 @@ const sampleProducts: Product[] = [
     orderCount: BigInt(3),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
     isTrending: false,
+    isNewArrival: true,
     createdAt: NOW,
   },
   {
@@ -78,6 +81,7 @@ const sampleProducts: Product[] = [
     orderCount: BigInt(18),
     fulfillmentBy: FulfillmentBy.AdminFulfilled,
     isTrending: true,
+    isNewArrival: false,
     createdAt: NOW,
   },
 ];
@@ -126,9 +130,9 @@ export const mockBackend: backendInterface = {
     "Your Fit & Try request has been confirmed! We'll bring it to your door.",
   createProduct: async (input) => ({
     __kind__: "ok",
-    ok: { ...input, id: `p${Date.now()}`, orderCount: BigInt(0), createdAt: NOW },
+    ok: { ...input, id: `p${Date.now()}`, orderCount: BigInt(0), isNewArrival: false, createdAt: NOW },
   }),
-  updateProduct: async (id, input) => ({ __kind__: "ok", ok: { ...input, id, orderCount: BigInt(0), createdAt: NOW } }),
+  updateProduct: async (id, input) => ({ __kind__: "ok", ok: { ...input, id, orderCount: BigInt(0), isNewArrival: false, createdAt: NOW } }),
   deleteProduct: async (_id) => ({ __kind__: "ok", ok: null }),
   listOrders: async () => [["order-001", sampleOrder]],
   listOrdersByCustomer: async (_phone) => [sampleOrder],
@@ -178,6 +182,10 @@ export const mockBackend: backendInterface = {
     __kind__: "ok",
     ok: { ...sampleProducts[0], isTrending: _trending },
   }),
+  setNewArrival: async (_id, _isNewArrival) => ({
+    __kind__: "ok",
+    ok: { ...sampleProducts[0], isNewArrival: _isNewArrival },
+  }),
   getNewArrivals: async () => sampleProducts.slice(0, 4),
   getSellerEarnings: async (_sellerId) => ({
     totalEarnings: BigInt(0),
@@ -220,4 +228,5 @@ export const mockBackend: backendInterface = {
     },
   }),
   getCoupon: async (_code) => null,
+  getCouponOrderStats: async (_code) => null,
 };

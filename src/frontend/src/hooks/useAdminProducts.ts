@@ -166,6 +166,25 @@ export function useMarkAdminNotificationRead() {
   });
 }
 
+/** Mark or unmark a product as New Arrival (admin only) */
+export function useSetNewArrival() {
+  const { actor } = useActor(createActor);
+  const queryClient = useQueryClient();
+  return useMutation<
+    { __kind__: "ok"; ok: Product } | { __kind__: "err"; err: string },
+    Error,
+    { productId: string; isNewArrival: boolean }
+  >({
+    mutationFn: async ({ productId, isNewArrival }) => {
+      if (!actor) throw new Error("Actor not ready");
+      return actor.setNewArrival(productId, isNewArrival);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+}
+
 /** Mark or unmark a product as trending (admin only) */
 export function useSetProductTrending() {
   const { actor } = useActor(createActor);

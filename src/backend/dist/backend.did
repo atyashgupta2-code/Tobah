@@ -41,6 +41,7 @@ type ProductInput =
    sellerName: text;
    sizes: vec text;
    stock: nat;
+   subcategory: opt text;
  };
 type ProductId = text;
 type ProductEarningBreakdown = 
@@ -61,6 +62,7 @@ type Product =
    hasSameDayDelivery: bool;
    id: ProductId;
    imageUrl: text;
+   isNewArrival: bool;
    isTrending: bool;
    name: text;
    orderCount: nat;
@@ -69,6 +71,7 @@ type Product =
    sellerName: text;
    sizes: vec text;
    stock: nat;
+   subcategory: opt text;
  };
 type PaymentMethod = 
  variant {
@@ -221,6 +224,12 @@ service : {
                                      });
   getAllNotifications: () -> (vec Notification) query;
   getCoupon: (code: text) -> (opt Coupon) query;
+  getCouponOrderStats: (code: text) ->
+   (opt record {
+          couponCode: text;
+          successfulOrders: nat;
+          totalOrders: nat;
+        }) query;
   getCustomer: (phone: text) -> (opt Customer) query;
   getNewArrivals: () -> (vec Product) query;
   getNotifications: (sellerId: opt text) -> (vec Notification) query;
@@ -252,6 +261,11 @@ service : {
       ok: Order;
     });
   removeSeller: (sellerId: SellerId) -> (bool);
+  setNewArrival: (productId: ProductId, isNewArrival: bool) ->
+   (variant {
+      err: text;
+      ok: Product;
+    });
   setProductTrending: (productId: ProductId, trending: bool) ->
    (variant {
       err: text;

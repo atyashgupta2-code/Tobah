@@ -75,6 +75,10 @@ interface FormValues {
 
 type FormErrors = Partial<Record<keyof FormValues, string>>;
 
+function isCityJammu(city: string): boolean {
+  return city.trim().toLowerCase() === "jammu";
+}
+
 function validate(values: FormValues): FormErrors {
   const errors: FormErrors = {};
   if (!values.name.trim()) errors.name = "Full name is required";
@@ -82,7 +86,12 @@ function validate(values: FormValues): FormErrors {
   else if (!/^\d{10}$/.test(values.phone.trim()))
     errors.phone = "Enter a valid 10-digit phone number";
   if (!values.address.trim()) errors.address = "Address is required";
-  if (!values.city.trim()) errors.city = "City is required";
+  if (!values.city.trim()) {
+    errors.city = "City is required";
+  } else if (!isCityJammu(values.city)) {
+    errors.city =
+      "Sorry, we currently only deliver to Jammu. Orders from other cities cannot be placed.";
+  }
   if (!values.pincode.trim()) errors.pincode = "Pincode is required";
   else if (!/^\d{6}$/.test(values.pincode.trim()))
     errors.pincode = "Enter a valid 6-digit pincode";
@@ -458,13 +467,25 @@ export default function Checkout() {
               <Input
                 id="city"
                 data-ocid="checkout.city_input"
-                placeholder="City"
+                placeholder="City (e.g. Jammu)"
                 value={values.city}
                 onChange={(e) => handleChange("city", e.target.value)}
                 onBlur={() => handleBlur("city")}
-                className="mt-1 bg-background border-border focus:border-primary"
+                className={`mt-1 bg-background border-border focus:border-primary ${
+                  errors.city && touched.city
+                    ? "border-destructive focus:border-destructive"
+                    : ""
+                }`}
               />
-              <FieldError msg={errors.city} />
+              {errors.city && touched.city && (
+                <p
+                  data-ocid="checkout.city_field_error"
+                  className="flex items-start gap-1.5 text-destructive text-xs mt-1.5 leading-snug"
+                >
+                  <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                  <span>{errors.city}</span>
+                </p>
+              )}
             </div>
 
             <div>
@@ -696,11 +717,27 @@ export default function Checkout() {
         )}
 
         {/* Place Order CTA */}
+        {values.city.trim() && !isCityJammu(values.city) && (
+          <div
+            data-ocid="checkout.city_delivery_error_state"
+            className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 flex items-start gap-2 text-destructive text-sm"
+          >
+            <AlertCircle size={15} className="mt-0.5 shrink-0" />
+            <span>
+              Sorry, we currently only deliver to Jammu. Orders from other
+              cities cannot be placed.
+            </span>
+          </div>
+        )}
+
         <Button
           type="submit"
           data-ocid="checkout.submit_button"
           size="lg"
-          disabled={createOrder.isPending}
+          disabled={
+            createOrder.isPending ||
+            (values.city.trim().length > 0 && !isCityJammu(values.city))
+          }
           className="w-full bg-primary text-primary-foreground font-black text-base py-6 rounded-xl uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-smooth shadow-lg disabled:opacity-60 disabled:scale-100"
         >
           {createOrder.isPending ? (

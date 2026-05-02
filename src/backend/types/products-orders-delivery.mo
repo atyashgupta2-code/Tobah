@@ -56,7 +56,8 @@ module {
     hasSameDayDelivery : Bool;
     hasFitAndTry : Bool;
     stock : Nat;
-    gender : Text; // Men | Women | Unisex | Handicrafts | Other
+    gender : Text; // Men | Women | Unisex | Handicrafts | Other | Shoes
+    subcategory : ?Text; // optional: Shoes → Men/Women; Other → Bedsheets/Artificial Jewellery/Other
     sellerId : Text;
     sellerName : Text;
     fulfillmentBy : FulfillmentBy;
@@ -74,12 +75,14 @@ module {
     hasSameDayDelivery : Bool;
     hasFitAndTry : Bool;
     stock : Nat;
-    gender : Text; // Men | Women | Unisex | Handicrafts | Other
+    gender : Text; // Men | Women | Unisex | Handicrafts | Other | Shoes
+    subcategory : ?Text; // optional: Shoes → Men/Women; Other → Bedsheets/Artificial Jewellery/Other
     sellerId : Text;
     sellerName : Text;
     orderCount : Nat;
     fulfillmentBy : FulfillmentBy;
     isTrending : Bool; // admin-controlled trending flag
+    isNewArrival : Bool; // admin-controlled new arrival flag
     createdAt : Int; // nanosecond timestamp when product was added
   };
 

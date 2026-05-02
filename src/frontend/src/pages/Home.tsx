@@ -21,7 +21,7 @@ import { useProducts } from "../hooks/useProducts";
 const SESSION_CATEGORY_KEY = "tbah_last_category";
 
 // ─── Category definition ───────────────────────────────────────────────────────
-type CategoryKey = "Men" | "Women" | "Handicrafts" | "Other";
+type CategoryKey = "Men" | "Women" | "Handicrafts" | "Other" | "Shoes";
 
 interface CategoryDef {
   key: CategoryKey;
@@ -31,7 +31,26 @@ interface CategoryDef {
   cardClass: string;
   genderValues: string[];
   bgImage: string;
+  subFilters?: SubFilter[];
 }
+
+interface SubFilter {
+  key: string;
+  label: string;
+}
+
+const OTHER_SUB_FILTERS: SubFilter[] = [
+  { key: "all", label: "All" },
+  { key: "Bedsheets", label: "Bedsheets" },
+  { key: "Artificial Jewellery", label: "Artificial Jewellery" },
+  { key: "Other", label: "Other" },
+];
+
+const SHOES_SUB_FILTERS: SubFilter[] = [
+  { key: "all", label: "All" },
+  { key: "Men", label: "Men" },
+  { key: "Women", label: "Women" },
+];
 
 const CATEGORIES: CategoryDef[] = [
   {
@@ -73,6 +92,17 @@ const CATEGORIES: CategoryDef[] = [
     genderValues: ["Other"],
     bgImage:
       "/assets/img_20260424_230559-019dc0a8-1cbd-719a-a372-78ada809d196.jpg",
+    subFilters: OTHER_SUB_FILTERS,
+  },
+  {
+    key: "Shoes",
+    label: "Shoes",
+    emoji: "👟",
+    description: "Step in Style",
+    cardClass: "category-card-shoes",
+    genderValues: ["Shoes"],
+    bgImage: "/assets/shoes-banner.png",
+    subFilters: SHOES_SUB_FILTERS,
   },
 ];
 
@@ -80,7 +110,6 @@ const CATEGORIES: CategoryDef[] = [
 interface USPCardData {
   imageUrl: string;
   title: string;
-  accentColor: string;
 }
 
 const USP_CARDS: USPCardData[] = [
@@ -88,18 +117,15 @@ const USP_CARDS: USPCardData[] = [
     imageUrl:
       "/assets/img_20260424_232245-019dc0a7-8a8c-73da-8f47-0f07dc6b862c.jpg",
     title: "Pay When It Arrives",
-    accentColor: "oklch(0.75 0.22 65)",
   },
   {
     imageUrl: "/assets/delivered-today.png",
     title: "Delivered Today",
-    accentColor: "oklch(0.62 0.28 315)",
   },
   {
     imageUrl:
       "/assets/img_20260424_231923-019dc0a7-86e1-7320-9074-673617197854.jpg",
     title: "Pay After Fit & Try",
-    accentColor: "oklch(0.70 0.20 200)",
   },
 ];
 
@@ -118,23 +144,23 @@ function useNewArrivals() {
 }
 
 // ─── USP Image Card ─────────────────────────────────────────────────────────────
-function USPImageCard({ imageUrl, title, accentColor }: USPCardData) {
+function USPImageCard({ imageUrl, title }: USPCardData) {
   const isDeliveredToday = title === "Delivered Today";
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden group cursor-default flex-1 min-w-0 flex flex-col"
+      className="relative rounded-2xl overflow-hidden group cursor-default flex flex-col w-full"
       style={{ minHeight: 280 }}
     >
-      {/* Background image */}
       <div
-        className="flex-1 relative overflow-hidden"
-        style={{ minHeight: 240 }}
+        className="relative w-full overflow-hidden"
+        style={{ minHeight: 240, flex: "1 1 auto" }}
       >
         <img
           src={imageUrl || "/assets/images/placeholder.svg"}
           alt={title}
-          className="absolute inset-0 w-full h-full object-cover object-center"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ objectPosition: "center center" }}
           loading="lazy"
           decoding="async"
           width={400}
@@ -143,25 +169,16 @@ function USPImageCard({ imageUrl, title, accentColor }: USPCardData) {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />
-        {/* Side accent line */}
-        <div
-          className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full z-10"
-          style={{ background: accentColor }}
-        />
       </div>
-      {/* Title below the photo */}
       <div
-        className="px-3 py-2.5 text-center"
+        className="w-full px-3 py-2.5 text-center flex-shrink-0"
         style={{
           background: "oklch(0.14 0.02 280)",
-          borderTop: `1px solid ${accentColor}44`,
+          borderTop: "1px solid oklch(0.32 0.015 280 / 0.4)",
         }}
       >
         {isDeliveredToday ? (
-          <p
-            className="font-display font-black text-sm leading-tight tracking-tight"
-            style={{ color: accentColor }}
-          >
+          <p className="font-display font-black text-sm leading-tight tracking-tight text-foreground">
             Delivered Today{" "}
             <span
               className="font-black"
@@ -175,10 +192,7 @@ function USPImageCard({ imageUrl, title, accentColor }: USPCardData) {
             </span>
           </p>
         ) : (
-          <p
-            className="font-display font-black text-sm leading-tight tracking-tight"
-            style={{ color: accentColor }}
-          >
+          <p className="font-display font-black text-sm leading-tight tracking-tight text-foreground">
             {title}
           </p>
         )}
@@ -284,7 +298,6 @@ function USPSection() {
           </h2>
           <div className="w-10 h-0.5 bg-gradient-to-r from-primary to-accent rounded-full mx-auto mt-2" />
         </div>
-        {/* flex-nowrap so all three stay in one row */}
         <div className="flex flex-row gap-2 flex-nowrap items-stretch">
           {USP_CARDS.map((card, i) => (
             <motion.div
@@ -293,7 +306,7 @@ function USPSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.25, delay: i * 0.08 }}
-              className="flex-1 min-w-0"
+              className="flex-1 min-w-0 flex flex-col"
             >
               <USPImageCard {...card} />
             </motion.div>
@@ -335,7 +348,6 @@ function CategoryCard({
       style={{ minHeight: 160 }}
       aria-pressed={isSelected}
     >
-      {/* Background photo — natural brightness */}
       <img
         src={category.bgImage}
         alt={category.label}
@@ -345,7 +357,6 @@ function CategoryCard({
         height={200}
         style={{ filter: "brightness(1.1) saturate(1.0)" }}
       />
-      {/* Overlay */}
       <div
         className="absolute inset-0"
         style={{
@@ -354,8 +365,6 @@ function CategoryCard({
             : "linear-gradient(135deg, rgba(0,0,0,0.40), rgba(0,0,0,0.22))",
         }}
       />
-
-      {/* Content */}
       <div
         className="relative z-10 p-4 flex flex-col justify-between h-full"
         style={{ minHeight: 160 }}
@@ -364,7 +373,6 @@ function CategoryCard({
           {category.emoji}
         </span>
         <div>
-          {/* Stylish label */}
           <p
             className="font-display leading-tight"
             style={{
@@ -392,8 +400,6 @@ function CategoryCard({
           </p>
         </div>
       </div>
-
-      {/* Selected indicator */}
       <div
         className="absolute bottom-2 right-2 w-6 h-6 rounded-full flex items-center justify-center z-10"
         style={{ background: "rgba(255,255,255,0.85)" }}
@@ -405,6 +411,56 @@ function CategoryCard({
         )}
       </div>
     </motion.button>
+  );
+}
+
+// ─── Sub-classification Filter Tabs ────────────────────────────────────────────
+interface SubFilterTabsProps {
+  filters: SubFilter[];
+  active: string;
+  onChange: (key: string) => void;
+  ocidPrefix: string;
+}
+
+function SubFilterTabs({
+  filters,
+  active,
+  onChange,
+  ocidPrefix,
+}: SubFilterTabsProps) {
+  return (
+    <div className="px-4 pt-3 pb-2 border-b border-border/20">
+      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground mb-2">
+        Filter by type
+      </p>
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
+        {filters.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            data-ocid={`${ocidPrefix}.subtab.${f.key.toLowerCase().replace(/\s+/g, "_")}`}
+            onClick={() => onChange(f.key)}
+            className={cn(
+              "shrink-0 px-3 py-1.5 rounded-full text-[11px] font-black border transition-colors duration-150 whitespace-nowrap",
+              active === f.key
+                ? "text-foreground border-transparent"
+                : "bg-card/50 text-muted-foreground border-border/40 hover:border-border hover:text-foreground",
+            )}
+            style={
+              active === f.key
+                ? {
+                    background:
+                      "linear-gradient(135deg, oklch(0.62 0.28 315), oklch(0.62 0.28 315 / 0.75))",
+                    boxShadow: "0 0 12px 2px oklch(0.62 0.28 315 / 0.35)",
+                  }
+                : undefined
+            }
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -422,8 +478,21 @@ function InlineCategoryProducts({
   category,
   productsRef,
 }: InlineCategoryProductsProps) {
+  const [subFilter, setSubFilter] = useState<string>("all");
+
+  // Reset sub-filter when category changes
+  const hasSubFilters = category.subFilters && category.subFilters.length > 0;
+
   const filtered = products
-    .filter((p) => category.genderValues.includes(p.gender ?? ""))
+    .filter((p) => {
+      // Category match
+      if (!category.genderValues.includes(p.gender ?? "")) return false;
+      // Sub-filter match (only for categories with sub-filters)
+      if (hasSubFilters && subFilter !== "all") {
+        return (p.subcategory ?? "") === subFilter;
+      }
+      return true;
+    })
     .sort((a, b) => {
       const aTrending = (a as Product & { isTrending?: boolean }).isTrending
         ? 1
@@ -477,6 +546,16 @@ function InlineCategoryProducts({
           </Link>
         </div>
 
+        {/* Sub-classification tabs (for Shoes and Other) */}
+        {hasSubFilters && (
+          <SubFilterTabs
+            filters={category.subFilters!}
+            active={subFilter}
+            onChange={setSubFilter}
+            ocidPrefix={`home.category_products.${category.key.toLowerCase()}`}
+          />
+        )}
+
         <div className="p-3">
           {isLoading ? (
             <div className="grid grid-cols-2 gap-3">
@@ -502,11 +581,19 @@ function InlineCategoryProducts({
               <p className="text-xs text-muted-foreground">
                 New styles are on the way — check back soon.
               </p>
+              {hasSubFilters && subFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setSubFilter("all")}
+                  className="text-xs font-bold text-primary hover:text-primary/70 mt-2"
+                >
+                  ✕ Show all {category.label}
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {filtered.map((p, i) => (
-                // Save category to sessionStorage so back button restores accordion
                 <div
                   key={p.id}
                   onClick={() => {
@@ -562,7 +649,7 @@ function InlineCategoryProducts({
   );
 }
 
-// ─── Trending Section — heading + four category cards only ─────────────────────
+// ─── Trending Section — heading + five category cards ─────────────────────────
 function TrendingSection({
   products,
   isLoading,
@@ -576,7 +663,10 @@ function TrendingSection({
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(SESSION_CATEGORY_KEY);
-      if (saved && ["Men", "Women", "Handicrafts", "Other"].includes(saved)) {
+      if (
+        saved &&
+        ["Men", "Women", "Handicrafts", "Other", "Shoes"].includes(saved)
+      ) {
         setSelectedCategory(saved as CategoryKey);
         sessionStorage.removeItem(SESSION_CATEGORY_KEY);
       }
@@ -603,8 +693,12 @@ function TrendingSection({
     ? CATEGORIES.findIndex((c) => c.key === selectedCategory)
     : -1;
 
+  // Row layout: [0,1], [2,3], [4 centered]
+  // Accordion injects after the row containing the selected card
   const row0HasExpanded = selectedIndex === 0 || selectedIndex === 1;
   const row1HasExpanded = selectedIndex === 2 || selectedIndex === 3;
+  const row2HasExpanded = selectedIndex === 4;
+
   const expandedCategoryDef = selectedCategory
     ? (CATEGORIES.find((c) => c.key === selectedCategory) ?? null)
     : null;
@@ -619,7 +713,7 @@ function TrendingSection({
       }}
     >
       <div className="max-w-screen-md mx-auto">
-        {/* Heading only — no products displayed here */}
+        {/* Heading */}
         <div className="mb-5">
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground mb-1">
             Most Popular
@@ -634,9 +728,9 @@ function TrendingSection({
           </p>
         </div>
 
-        {/* Four category cards in 2×2 grid */}
+        {/* 5 category cards: 2×2 + 1 centered */}
         <div className="grid grid-cols-2 gap-3">
-          {/* Row 0 */}
+          {/* Row 0: Men, Women */}
           {CATEGORIES.slice(0, 2).map((cat, i) => (
             <CategoryCard
               key={cat.key}
@@ -660,7 +754,7 @@ function TrendingSection({
             )}
           </AnimatePresence>
 
-          {/* Row 1 */}
+          {/* Row 1: Handicrafts, Other */}
           {CATEGORIES.slice(2, 4).map((cat, i) => (
             <CategoryCard
               key={cat.key}
@@ -676,6 +770,32 @@ function TrendingSection({
             {row1HasExpanded && expandedCategoryDef && (
               <InlineCategoryProducts
                 key={`trending-row1-${selectedCategory}`}
+                products={products}
+                isLoading={isLoading}
+                category={expandedCategoryDef}
+                productsRef={expandedRef}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Row 2: Shoes — same size as others, shifted right to sit between/under Handicrafts and Other */}
+          <div className="col-span-2 flex justify-end pr-[2px]">
+            <div className="w-[calc(50%-6px)]">
+              <CategoryCard
+                key={CATEGORIES[4].key}
+                category={CATEGORIES[4]}
+                isSelected={selectedCategory === CATEGORIES[4].key}
+                onClick={() => handleCategorySelect(CATEGORIES[4].key)}
+                index={4}
+              />
+            </div>
+          </div>
+
+          {/* Accordion for row 2 (Shoes) */}
+          <AnimatePresence>
+            {row2HasExpanded && expandedCategoryDef && (
+              <InlineCategoryProducts
+                key={`trending-row2-${selectedCategory}`}
                 products={products}
                 isLoading={isLoading}
                 category={expandedCategoryDef}
@@ -763,10 +883,10 @@ export default function Home() {
         <PromoBanner />
       </section>
 
-      {/* 3. Why Everyone is Obsessed — FIRST above categories */}
+      {/* 3. Why Everyone is Obsessed */}
       <USPSection />
 
-      {/* 4. Trending section — heading + four category cards + inline accordion */}
+      {/* 4. Trending section — heading + five category cards + inline accordion */}
       <div ref={productsRef}>
         <TrendingSection products={products} isLoading={isLoading} />
       </div>
